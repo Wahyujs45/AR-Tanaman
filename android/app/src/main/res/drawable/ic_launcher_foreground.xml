@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ikon: daun di dalam bingkai pemindai. Semua isi berada di zona aman 66dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- bingkai pemindai -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFEDF0F4"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M32,42 V32 H42 M66,32 H76 V42 M76,66 V76 H66 M42,76 H32 V66" />
+    <!-- daun -->
+    <path
+        android:fillColor="#FFD9A72E"
+        android:pathData="M54,36 C66,42 70,57 54,72 C38,57 42,42 54,36 Z" />
+    <!-- sepertiga bawah daun dicelup warna kesumba -->
+    <group>
+        <clip-path android:pathData="M54,36 C66,42 70,57 54,72 C38,57 42,42 54,36 Z" />
+        <path
+            android:fillColor="#FFE0692F"
+            android:pathData="M30,60 H78 V78 H30 Z" />
+    </group>
+    <!-- tulang daun -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF1C2B4A"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:pathData="M54,40 V70 M54,50 L59.5,45.5 M54,50 L48.5,45.5 M54,58 L60.5,53 M54,58 L47.5,53" />
+</vector>

@@ -1,0 +1,74 @@
+TEKS LISTING GOOGLE PLAY — KEBUN PEWARNA AR
+==========================================
+
+Nama aplikasi (maks. 30 karakter)
+Kebun Pewarna AR
+
+Deskripsi singkat (maks. 80 karakter)
+Arahkan kamera ke tanaman pewarna alam, infografisnya muncul sendiri.
+
+Deskripsi lengkap
+Kebun Pewarna AR adalah pemandu kebun tanaman pewarna alam di genggaman Anda. Arahkan kamera ponsel ke daun, ranting, atau label QR di papan nama tanaman, tahan sebentar, lalu infografis tanaman tersebut muncul langsung di layar.
+
+Tanaman yang dikenali:
+• Jolawe (Terminalia bellirica)
+• Mahoni (Swietenia mahagoni)
+• Nangka (Artocarpus heterophyllus)
+• Kesumba (Bixa orellana)
+• Indigofera / tom / tarum (Indigofera tinctoria)
+• Jati (Tectona grandis)
+• Mangga (Mangifera indica)
+• Sawo kecik (Manilkara kauki)
+
+Setiap infografis memuat:
+• Nama umum, nama ilmiah, famili, dan nama daerah
+• Ciri pengenal tanaman
+• Bagian tanaman yang dipakai sebagai pewarna dan zat warnanya
+• Contoh warna kain dengan fiksator tawas, kapur, dan tunjung
+• Cara ekstraksi warna
+• Manfaat lain dan fakta unik
+• Foto dan video pendukung
+
+Mudah dipakai:
+• Tanpa akun, tanpa pengaturan. Buka aplikasi lalu langsung memindai.
+• Berjalan tanpa internet. Model pengenalan tersimpan di dalam aplikasi.
+• Label QR di papan nama memberi hasil yang selalu tepat.
+• Semua infografis juga bisa dibuka dari menu Koleksi tanpa kamera.
+
+Privasi:
+Gambar kamera diproses di ponsel Anda saja dan tidak dikirim ke mana pun. Aplikasi tidak memuat iklan dan tidak mengumpulkan data pribadi.
+
+Dikembangkan untuk pembelajaran di lingkungan Poltekkes Kemenkes Semarang.
+
+Kategori
+Pendidikan
+
+Email kontak
+(isi email resmi pengelola)
+
+URL kebijakan privasi
+https://NAMA-SITUS/kebijakan-privasi.html
+
+
+JAWABAN FORMULIR PLAY CONSOLE
+=============================
+
+Keamanan data (Data safety)
+• Apakah aplikasi mengumpulkan atau membagikan jenis data pengguna yang wajib dilaporkan? → Tidak
+  (Gambar kamera diolah di perangkat dan tidak dikirim keluar perangkat, sehingga tidak termasuk "dikumpulkan".)
+• Apakah semua data dienkripsi saat transit? → Ya (paket daring diunduh lewat HTTPS)
+• Cara meminta penghapusan data → Tidak ada data yang disimpan di server.
+
+Rating konten
+• Kategori: Referensi, Berita, atau Pendidikan
+• Semua pertanyaan kekerasan, seksual, bahasa kasar, obat terlarang, perjudian → Tidak
+• Interaksi pengguna / berbagi lokasi / pembelian digital → Tidak
+
+Target audiens
+• Pilihan paling sederhana: 13 tahun ke atas.
+• Bila ingin menyasar anak di bawah 13 tahun, pilih kelompok usia tersebut. Aplikasi memenuhi syarat karena tidak mengumpulkan data, tetapi peninjauan Families Policy biasanya lebih lama.
+
+Iklan → Tidak ada iklan
+Akses aplikasi → Semua fitur tersedia tanpa login
+Aplikasi berita → Bukan
+Izin sensitif → Kamera (untuk mengenali tanaman dan membaca label QR)

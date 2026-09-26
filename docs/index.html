@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F141C">
+<title>Kebun Pewarna AR</title>
+<script>
+/* Mode aplikasi: berjalan di dalam aplikasi Android (WebView, berkas lokal). */
+window.IS_APP = !!window.KebunApp || location.hostname === 'appassets.androidplatform.net';
+document.documentElement.classList.toggle('app', window.IS_APP);
+if (!window.IS_APP){ /* versi web memuat huruf dari Google Fonts; aplikasi memakai huruf sistem agar sepenuhnya luring */
+  const l = document.createElement('link'); l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Newsreader:ital,opsz,wght@1,6..72,400&display=swap';
+  document.head.appendChild(l);
+}
+</script>
+<style>
+/* Tampilan gelap disengaja: aplikasi kamera lapangan, kontras tinggi di bawah terik. */
+:root{
+  --ink:#0F141C; --panel:#171E29; --panel2:#1F2835; --line:#2C3748;
+  --text:#EDF0F4; --muted:#98A3B3; --accent:#9DB7F0; --accent-ink:#0F1A33;
+  --ok:#6FCF97; --warn:#F2C14E; --bad:#EB6F5E;
+  --r:14px; color-scheme:dark;
+  --f-disp:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Figtree",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --f-latin:"Newsreader",Georgia,"Times New Roman",serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ink);color:var(--text);font:15px/1.5 var(--f-body);-webkit-text-size-adjust:100%;overscroll-behavior:none}
+[hidden]{display:none!important}
+h1,h2,h3{font-family:var(--f-disp);font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balance}
+h1{font-size:26px} h2{font-size:24px;line-height:1.15} h3{font-size:17px}
+p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.latin{font-family:var(--f-latin);font-style:italic;font-weight:400}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+
+#app{display:flex;flex-direction:column;height:100%;height:100dvh}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;border-bottom:1px solid var(--line);background:var(--ink)}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-disp);font-weight:700;font-size:17px;white-space:nowrap}
+.mark{width:22px;height:22px;border-radius:6px;flex:none;
+  background:linear-gradient(90deg,#A67C45 0 12.5%,#8A4B2E 0 25%,#D9A72E 0 37.5%,#E0692F 0 50%,#2F5E8E 0 62.5%,#8E4550 0 75%,#A9A548 0 87.5%,#9C7A4E 0)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;
+  background:var(--panel2);color:var(--muted);border:1px solid var(--line);white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)}
+main{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;overflow:auto}
+#v-scan{overflow:hidden;display:flex;flex-direction:column}
+nav.bottom{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);background:var(--ink);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.bottom button{padding:12px 4px;font-weight:600;color:var(--muted);font-size:14px}
+nav.bottom button.on{color:var(--text);box-shadow:inset 0 2px 0 var(--accent)}
+
+/* ---------- kamera ---------- */
+.stage{position:relative;flex:1;min-height:0;background:#05070A;overflow:hidden}
+.stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.stage-top{position:absolute;left:0;right:0;top:12px;display:flex;justify-content:center;padding-inline:16px;pointer-events:none}
+.hint{background:rgba(10,14,20,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.08);
+  padding:7px 14px;border-radius:999px;font-size:13px;font-weight:500;text-align:center;max-width:100%}
+.cands{position:absolute;left:12px;top:56px;display:grid;gap:4px;width:min(46vw,210px);pointer-events:none}
+.cand{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:11.5px;background:rgba(10,14,20,.66);padding:5px 8px;border-radius:8px}
+.cand i{grid-column:1/-1;height:3px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden;display:block}
+.cand i b{display:block;height:100%;background:var(--c,var(--accent))}
+.stage-ctl{position:absolute;left:0;right:0;bottom:16px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding-inline:16px}
+.round{background:rgba(10,14,20,.72);border:1px solid rgba(255,255,255,.14);padding:9px 14px;border-radius:999px;font-weight:600;font-size:13px}
+.round.on{background:var(--warn);color:#241A00;border-color:transparent}
+.primary{background:var(--accent);color:var(--accent-ink);font-weight:700;padding:11px 18px;border-radius:12px}
+.ghost{border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-weight:600;background:var(--panel2)}
+.danger{border:1px solid color-mix(in srgb,var(--bad) 55%,transparent);color:var(--bad);padding:10px 16px;border-radius:12px;font-weight:600}
+button:disabled{opacity:.45;cursor:not-allowed}
+.nosecure{position:absolute;inset:auto 16px 72px;background:#2B1B12;border:1px solid #6A3A22;color:#FFD9C4;padding:12px 14px;border-radius:12px;font-size:13px}
+
+/* ---------- lembar infografis ---------- */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:5;background:var(--panel);border-top-left-radius:20px;border-top-right-radius:20px;
+  border-top:1px solid var(--line);box-shadow:0 -12px 40px rgba(0,0,0,.45);max-height:78%;display:flex;flex-direction:column;
+  transform:translateY(0);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+@media (prefers-reduced-motion:reduce){.sheet{transition:none}}
+.sheet.peek .ibody{display:none}
+.sheet .grab{width:44px;height:5px;border-radius:3px;background:var(--line);margin:8px auto 0}
+.info{--dye:#9DB7F0;display:flex;flex-direction:column;min-height:0;flex:1 1 auto;overflow:hidden}
+.ihead{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 18px 12px;align-items:start}
+.ihead .src{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb,var(--dye) 55%,#FFFFFF)}
+.expand{color:color-mix(in srgb,var(--dye) 55%,#FFFFFF)!important}
+.ihead h2{margin-top:2px}
+.ihead .latin{font-size:17px;color:#D5DCE6}
+.ihead small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.dyebar{display:flex;height:8px;margin:0 18px;border-radius:4px;overflow:hidden}
+.dyebar span{flex:1}
+.ihead-act{display:flex;gap:6px}
+.iconbtn{width:36px;height:36px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;font-size:18px;line-height:1}
+.expand{margin:10px 18px 14px;width:calc(100% - 36px);text-align:center;border:1px solid var(--line);border-radius:12px;padding:9px;font-weight:600;color:var(--dye);background:var(--panel2)}
+.sheet.full .expand{display:none}
+.ibody{display:flex;flex-direction:column;min-height:0;flex:1}
+.itabs{display:flex;gap:4px;padding:12px 18px 0;overflow-x:auto;scrollbar-width:none}
+.itabs button{padding:8px 12px;border-radius:10px;font-weight:600;font-size:14px;color:var(--muted);white-space:nowrap}
+.itabs button.on{background:var(--panel2);color:var(--text);box-shadow:inset 0 -2px 0 var(--dye)}
+.ipanes{overflow:auto;padding:14px 18px 22px;flex:1;min-height:0}
+.ipane{display:grid;gap:14px;max-width:68ch}
+.ipane h4{margin:0;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.ipane ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+.sw{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel2)}
+.sw i{display:block;height:54px;background:var(--c)}
+.sw div{padding:8px 10px;font-size:13px;line-height:1.35}
+.sw b{display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.note{font-size:13px;color:var(--muted);border-left:3px solid var(--dye);padding-left:10px}
+.media{display:grid;gap:12px}
+.media figure{margin:0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line)}
+.media img,.media video,.media iframe{display:block;width:100%;max-width:100%;border:0}
+.media iframe{aspect-ratio:16/9}
+.media figcaption{padding:8px 10px;font-size:13px;color:var(--muted);background:var(--panel2)}
+.fact{background:color-mix(in srgb,var(--dye) 14%,var(--panel2));border-radius:12px;padding:12px 14px;font-size:14px}
+
+/* ---------- koleksi & admin ---------- */
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
+.lede{color:var(--muted);max-width:62ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.pcard{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+.pcard .strip{display:flex;height:10px}.pcard .strip span{flex:1}
+.pcard .body{padding:12px 14px 14px;display:grid;gap:3px}
+.pcard h3{font-size:18px}
+.pcard .latin{color:#C9D1DC;font-size:15px}
+.pcard .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.chip.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.chip.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:12px;min-width:0}
+.card .sub{color:var(--muted);font-size:14px}
+.tabsx{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.tabsx button{padding:8px 14px;border-radius:999px;border:1px solid var(--line);font-weight:600;font-size:14px;white-space:nowrap;color:var(--muted)}
+.tabsx button.on{background:var(--text);color:var(--ink);border-color:var(--text)}
+.f{display:grid;gap:5px;font-size:13px;color:var(--muted);font-weight:500;min-width:0}
+.f input,.f select,.f textarea{background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 11px;color:var(--text);font-size:15px;width:100%;min-width:0}
+.f textarea{min-height:84px;resize:vertical;line-height:1.45}
+.f input[type=color]{padding:2px;height:40px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btnrow label.ghost{cursor:pointer}
+.stage.small{flex:none;aspect-ratio:4/3;border-radius:12px;max-width:100%}
+.tpill{position:absolute;left:10px;top:10px}
+.hintbox{font-size:13.5px;color:var(--muted);line-height:1.5}
+.hintbox b{color:var(--text);font-weight:600}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
+.thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--panel2)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;right:3px;top:3px;width:24px;height:24px;border-radius:7px;background:rgba(0,0,0,.66);font-size:14px;line-height:1}
+.thumb span{position:absolute;left:3px;bottom:3px;font-size:10px;background:rgba(0,0,0,.66);padding:1px 5px;border-radius:5px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.04em}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.cm td{text-align:center;font-family:var(--f-mono);min-width:38px}
+.cm th.rot{writing-mode:vertical-rl;transform:rotate(180deg);height:92px;vertical-align:bottom;text-align:left}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:var(--panel2);border-radius:12px;padding:12px 14px;border:1px solid var(--line)}
+.stat b{display:block;font-family:var(--f-mono);font-size:26px;font-variant-numeric:tabular-nums}
+.stat span{font-size:12.5px;color:var(--muted)}
+.stat.ok b{color:var(--ok)} .stat.bad b{color:var(--bad)} .stat.warn b{color:var(--warn)}
+.reco{background:color-mix(in srgb,var(--accent) 10%,var(--panel2));border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+.wrows{display:grid;gap:8px}
+.wrow{display:grid;grid-template-columns:1fr 1.3fr 64px 36px;gap:6px;align-items:end}
+.mlist{display:grid;gap:6px}
+.mitem{display:flex;gap:10px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13.5px}
+.mitem .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.labels{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.qlabel{background:#fff;color:#111;border-radius:12px;padding:14px;display:grid;gap:6px;justify-items:center;text-align:center;border-top:10px solid var(--c)}
+.qlabel svg{width:100%;max-width:180px;height:auto}
+.qlabel b{font-family:var(--f-disp);font-size:20px}
+.qlabel i{font-family:var(--f-latin);font-size:15px}
+.qlabel small{font-size:11px;color:#555}
+.modal{position:fixed;inset:0;z-index:40;background:rgba(3,5,8,.7);display:flex;align-items:flex-end;justify-content:center}
+.modal-card{background:var(--panel);width:min(720px,100%);max-height:92%;border-top-left-radius:20px;border-top-right-radius:20px;display:flex;flex-direction:column;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (min-width:760px){.modal{align-items:center}.modal-card{border-radius:20px;max-height:86%}}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:60;
+  background:var(--text);color:var(--ink);padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;max-width:calc(100% - 32px);text-align:center}
+.confirm{background:#2A1A18;border:1px solid #5C2F29;border-radius:12px;padding:12px;display:grid;gap:10px;font-size:14px}
+.gate{max-width:420px}
+.guide ol{margin:0;padding-left:20px;display:grid;gap:8px}
+.guide code{font-family:var(--f-mono);font-size:12.5px;background:var(--ink);padding:1px 6px;border-radius:5px;border:1px solid var(--line)}
+
+.app nav.bottom{grid-template-columns:repeat(2,1fr)}
+.app nav.bottom [data-view=admin],.app #v-admin,.app .cands,.app .webonly,.app #btnStart{display:none!important}
+.coach,.camblock{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(6,9,13,.78);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.coach-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:14px;width:min(380px,100%)}
+.coach-card ol{margin:0;padding:0;list-style:none;display:grid;gap:12px;counter-reset:s}
+.coach-card li{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;counter-increment:s;font-size:15px}
+.coach-card li::before{content:counter(s);width:30px;height:30px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;font-family:var(--f-mono);font-size:13px;color:var(--accent)}
+.coach-card p{color:var(--muted);font-size:13.5px}
+#printArea{display:none}
+@media print{
+  @page{margin:10mm}
+  body{background:#fff}
+  #app,#modal,#toast{display:none!important}
+  #printArea{display:grid!important;grid-template-columns:repeat(var(--cols,3),1fr);gap:6mm}
+  #printArea .qlabel{break-inside:avoid;border:1px solid #bbb;border-top:6mm solid var(--c);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><span>Kebun Pewarna AR</span></div>
+    <span id="enginePill" class="pill warn" title="">Memuat mesin…</span>
+  </header>
+
+  <main>
+    <!-- ================= PINDAI ================= -->
+    <section id="v-scan" class="view">
+      <div class="stage" id="stage">
+        <video id="cam" playsinline muted autoplay></video>
+        <canvas id="ov"></canvas>
+        <div class="stage-top"><span id="hint" class="hint">Ketuk “Nyalakan kamera”, lalu arahkan kotak ke daun atau label QR.</span></div>
+        <div class="cands" id="cands"></div>
+        <div id="coach" class="coach" hidden>
+          <div class="coach-card">
+            <h3>Cara memakai</h3>
+            <ol>
+              <li><span>Arahkan kotak di layar ke <b>daun</b>, <b>ranting</b>, atau <b>label QR</b> di papan nama tanaman.</span></li>
+              <li><span>Tahan ponsel diam 1–2 detik.</span></li>
+              <li><span>Infografis muncul sendiri. Ketuk “Baca infografis lengkap” untuk membaca semuanya.</span></li>
+            </ol>
+            <p>Gambar kamera diproses di ponsel ini saja dan tidak dikirim ke mana pun.</p>
+            <button id="coachOk" class="primary">Mulai memindai</button>
+          </div>
+        </div>
+        <div id="camBlock" class="camblock" hidden>
+          <div class="coach-card">
+            <h3>Kamera belum diizinkan</h3>
+            <p>Aplikasi memakai kamera untuk mengenali tanaman. Gambar diproses di ponsel ini saja dan tidak dikirim ke mana pun.</p>
+            <div class="btnrow"><button id="camRetry" class="primary">Izinkan kamera</button><button id="camSettings" class="ghost" hidden>Buka pengaturan</button></div>
+            <p>Tanpa kamera, infografis tetap bisa dibuka dari menu Koleksi.</p>
+          </div>
+        </div>
+        <div id="noSecure" class="nosecure" hidden>Kamera hanya bisa menyala bila halaman dibuka lewat alamat <b>https://</b> (atau localhost). Unggah berkas ini ke hosting ber-HTTPS, lalu buka dari ponsel.</div>
+        <div class="stage-ctl">
+          <button id="btnStart" class="primary">Nyalakan kamera</button>
+          <button id="btnTorch" class="round" hidden>Senter</button>
+          <button id="btnFlip" class="round" hidden>Ganti kamera</button>
+        </div>
+      </div>
+      <div id="sheet" class="sheet peek" hidden></div>
+    </section>
+
+    <!-- ================= KOLEKSI ================= -->
+    <section id="v-koleksi" class="view" hidden>
+      <div class="wrap">
+        <div style="display:grid;gap:6px">
+          <h1>Delapan tanaman pewarna alam</h1>
+          <p class="lede">Ketuk kartu untuk membuka infografisnya tanpa memindai. Strip warna di atas kartu adalah warna kain yang dihasilkan tiap tanaman.</p>
+        </div>
+        <div id="grid" class="grid"></div>
+      </div>
+    </section>
+
+    <!-- ================= ADMIN ================= -->
+    <section id="v-admin" class="view" hidden>
+      <div class="wrap">
+        <div id="gate" class="card gate">
+          <h3>Masuk sebagai pengelola</h3>
+          <p class="sub">Halaman ini untuk melatih pengenalan, mengisi infografis, mencetak label QR, dan menerbitkan paket data.</p>
+          <label class="f" for="pinIn">PIN<input id="pinIn" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN awal: 1234"></label>
+          <button id="btnGate" class="primary">Masuk</button>
+        </div>
+
+        <div id="adminBody" hidden style="display:grid;gap:16px">
+          <nav class="tabsx" id="atabs">
+            <button data-tab="latih" class="on">Latih</button>
+            <button data-tab="info">Infografis</button>
+            <button data-tab="uji">Uji akurasi</button>
+            <button data-tab="qr">Label QR</button>
+            <button data-tab="paket">Paket &amp; setelan</button>
+          </nav>
+
+          <!-- LATIH -->
+          <div id="tab-latih" style="display:grid;gap:16px">
+            <div class="card">
+              <h3>Rekam contoh latih</h3>
+              <label class="f" for="trainClass">Kelas yang direkam<select id="trainClass"></select></label>
+              <div class="stage small" id="tStage">
+                <video id="tcam" playsinline muted autoplay></video>
+                <canvas id="tov"></canvas>
+                <span class="pill tpill" id="tPill">Kamera mati</span>
+              </div>
+              <div class="btnrow">
+                <button id="tCam" class="ghost">Nyalakan kamera</button>
+                <button id="tOne" class="ghost" disabled>Rekam 1</button>
+                <button id="tBurst" class="primary" disabled>Rekam beruntun (12)</button>
+                <label class="ghost" for="tUpload">Unggah foto</label>
+                <input id="tUpload" type="file" accept="image/*" multiple hidden>
+              </div>
+              <p class="hintbox">Rekam tiap tanaman dalam <b>minimal 3 sesi berbeda</b>: helai daun dari dekat, ranting dan tajuk dari jarak 1–2 m, batang atau kulit kayu, serta buah atau bunga bila ada. Ambil di jam dan cahaya yang berbeda. Target <b>≥ 30 contoh per tanaman</b>. Isi juga kelas <b>Latar</b> dengan hal yang bukan salah satu dari 8 tanaman (rumput, tanaman lain di sekitar kebun, tembok, tanah, orang). Kelas ini yang membuat mesin berani menjawab “tidak dikenali” alih-alih menebak.</p>
+            </div>
+            <div class="card">
+              <h3>Status latih</h3>
+              <div class="tbl" id="trainTable"></div>
+            </div>
+            <div class="card">
+              <h3 id="thumbTitle">Contoh</h3>
+              <div id="thumbs" class="thumbs"></div>
+            </div>
+          </div>
+
+          <!-- INFOGRAFIS -->
+          <div id="tab-info" hidden style="display:grid;gap:16px">
+            <div class="card">
+              <div class="row">
+                <label class="f" for="ePlant">Tanaman<select id="ePlant"></select></label>
+                <div class="btnrow" style="align-self:end"><button id="eNew" class="ghost">+ Tanaman baru</button><button id="ePreview" class="ghost">Pratinjau</button></div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Identitas</h3>
+              <div class="row">
+                <label class="f" for="eNama">Nama umum<input id="eNama"></label>
+                <label class="f" for="eLatin">Nama ilmiah<input id="eLatin"></label>
+              </div>
+              <div class="row">
+                <label class="f" for="eFamili">Famili<input id="eFamili"></label>
+                <label class="f" for="eLokal">Nama daerah<input id="eLokal"></label>
+              </div>
+              <label class="f" for="eLokasi">Lokasi di kebun (petak/nomor)<input id="eLokasi" placeholder="Petak B-2, sisi timur"></label>
+              <label class="f" for="eRingkas">Ringkasan<textarea id="eRingkas"></textarea></label>
+              <label class="f" for="eCiri">Ciri pengenal (satu baris satu ciri)<textarea id="eCiri"></textarea></label>
+              <label class="f" for="eManfaat">Manfaat lain (satu baris satu butir)<textarea id="eManfaat"></textarea></label>
+              <label class="f" for="eFakta">Fakta unik<textarea id="eFakta" style="min-height:60px"></textarea></label>
+            </div>
+            <div class="card">
+              <h3>Pewarna</h3>
+              <div class="row">
+                <label class="f" for="eBagian">Bagian yang dipakai<input id="eBagian"></label>
+                <label class="f" for="eZat">Zat warna<input id="eZat"></label>
+              </div>
+              <label class="f" for="eProses">Cara ekstraksi / catatan<textarea id="eProses"></textarea></label>
+              <div class="wrows" id="eWarna"></div>
+              <div class="btnrow"><button id="eAddW" class="ghost">+ Baris warna</button></div>
+            </div>
+            <div class="card">
+              <h3>Media (gambar &amp; video)</h3>
+              <div class="mlist" id="eMedia"></div>
+              <div class="row">
+                <label class="f" for="eCap">Keterangan media<input id="eCap" placeholder="Kain katun, 6 kali celup"></label>
+                <label class="f" for="eUrl">Atau tautan (gambar, video .mp4, YouTube)<input id="eUrl" placeholder="https://…"></label>
+              </div>
+              <div class="btnrow">
+                <label class="ghost" for="eFile">Unggah gambar/video</label>
+                <input id="eFile" type="file" accept="image/*,video/*" multiple hidden>
+                <button id="eAddUrl" class="ghost">Tambah tautan</button>
+              </div>
+            </div>
+            <div class="btnrow">
+              <button id="eSave" class="primary">Simpan infografis</button>
+              <button id="eDel" class="danger">Hapus tanaman ini</button>
+            </div>
+            <div id="eDelConfirm" class="confirm" hidden>
+              <span>Hapus tanaman ini beserta semua contoh latihnya? Tindakan ini tidak bisa dibatalkan.</span>
+              <div class="btnrow"><button id="eDelYes" class="danger">Ya, hapus</button><button id="eDelNo" class="ghost">Batal</button></div>
+            </div>
+          </div>
+
+          <!-- UJI -->
+          <div id="tab-uji" hidden style="display:grid;gap:16px">
+            <div class="card">
+              <h3>Uji silang per sesi</h3>
+              <p class="sub">Setiap sesi rekaman disembunyikan bergantian, lalu ditebak memakai sesi-sesi lainnya. Cara ini meniru kondisi nyata: foto hari ini dikenali dari rekaman hari lain, sehingga angkanya tidak menggelembung oleh foto yang nyaris kembar.</p>
+              <div class="btnrow"><button id="btnEval" class="primary">Jalankan uji</button><span id="evalMsg" class="muted" style="font-size:13px"></span></div>
+            </div>
+            <div id="evalOut" style="display:grid;gap:16px"></div>
+          </div>
+
+          <!-- QR -->
+          <div id="tab-qr" hidden style="display:grid;gap:16px">
+            <div class="card">
+              <h3>Label QR untuk papan nama</h3>
+              <p class="sub">QR adalah jalur yang pasti benar: begitu terbaca, infografis yang tampil 100% sesuai tanamannya. Tempel di papan nama tiap pohon. Bila dipindai dengan kamera ponsel biasa, QR juga langsung membuka infografis di aplikasi ini.</p>
+              <div class="row">
+                <label class="f" for="qrBase">Alamat aplikasi (terisi otomatis saat di-hosting)<input id="qrBase"></label>
+                <label class="f" for="qrCols">Label per baris saat dicetak<select id="qrCols"><option>2</option><option selected>3</option><option>4</option></select></label>
+              </div>
+              <div class="btnrow"><button id="btnPrint" class="primary">Cetak label</button></div>
+            </div>
+            <div id="qrGrid" class="labels"></div>
+          </div>
+
+          <!-- PAKET -->
+          <div id="tab-paket" hidden style="display:grid;gap:16px">
+            <div class="card">
+              <h3>Terbitkan ke semua ponsel</h3>
+              <p class="sub">Pelatihan tersimpan di ponsel admin. Agar ponsel pengunjung ikut mengenali tanaman, unduh paket lalu letakkan berkasnya di folder hosting yang sama dengan aplikasi, bernama <span class="mono">paket-ar.json</span>. Setiap ponsel memuat paket terbaru otomatis saat aplikasi dibuka.</p>
+              <label class="f" style="display:flex;gap:8px;align-items:center;color:var(--text)"><input id="pkMedia" type="checkbox" checked style="width:auto"> Sertakan gambar dan video unggahan di dalam paket</label>
+              <div class="btnrow">
+                <button id="pkExport" class="primary">Unduh paket-ar.json</button>
+                <label class="ghost" for="pkImport">Impor paket</label>
+                <input id="pkImport" type="file" accept=".json,application/json" hidden>
+                <button id="pkServer" class="ghost">Muat ulang dari server</button>
+              </div>
+              <p id="pkInfo" class="muted" style="font-size:13px"></p>
+            </div>
+            <div class="card">
+              <h3>Setelan mesin</h3>
+              <div class="row">
+                <label class="f" for="sMode">Model jaringan saraf<select id="sMode">
+                  <option value="akurat">MobileNetV2 1.0 — paling akurat (unduh ±14 MB sekali)</option>
+                  <option value="ringan">MobileNetV2 0.35 — ringan (±2 MB), untuk ponsel lama</option>
+                </select></label>
+                <label class="f" for="sK">Frame berturut-turut sebelum mengunci<input id="sK" type="number" min="2" max="15" step="1"></label>
+              </div>
+              <div class="row">
+                <label class="f" for="sTau">Ambang keyakinan (0–1)<input id="sTau" type="number" min="0.3" max="0.99" step="0.01"></label>
+                <label class="f" for="sMu">Ambang selisih dengan tebakan kedua (0–1)<input id="sMu" type="number" min="0" max="0.9" step="0.01"></label>
+              </div>
+              <label class="f" for="sPin">PIN admin baru (kosongkan bila tetap)<input id="sPin" type="password" inputmode="numeric" autocomplete="new-password"></label>
+              <div class="btnrow"><button id="sSave" class="primary">Simpan setelan</button><button id="sReset" class="danger">Kosongkan semua data</button></div>
+              <div id="sResetConfirm" class="confirm" hidden>
+                <span>Semua contoh latih, media, dan perubahan infografis di ponsel ini akan dihapus, lalu 8 tanaman bawaan dipulihkan.</span>
+                <div class="btnrow"><button id="sResetYes" class="danger">Ya, kosongkan</button><button id="sResetNo" class="ghost">Batal</button></div>
+              </div>
+            </div>
+            <div class="card guide">
+              <h3>Cara memasang</h3>
+              <ol>
+                <li>Unggah <code>index.html</code> ke hosting ber-HTTPS (GitHub Pages, Netlify, atau server kampus). Kamera ponsel menolak menyala di alamat <code>http://</code> biasa.</li>
+                <li>Buka alamatnya di ponsel admin, masuk ke Admin, lalu latih 8 tanaman dan kelas Latar langsung di kebun.</li>
+                <li>Jalankan <b>Uji akurasi</b>. Terapkan ambang yang disarankan bila “salah kenali” masih di atas nol.</li>
+                <li>Cetak <b>Label QR</b> dan pasang di papan nama tiap tanaman.</li>
+                <li>Unduh <code>paket-ar.json</code> dan unggah ke folder yang sama dengan <code>index.html</code>.</li>
+                <li>Opsional untuk kebun tanpa sinyal: simpan salinan pustaka di <code>lib/tf.min.js</code> dan <code>lib/jsQR.js</code>, serta model di <code>model/mobilenet_v2_100/</code>. Aplikasi memakai salinan lokal lebih dulu sebelum CDN.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom" id="nav">
+    <button data-view="scan" class="on">Pindai</button>
+    <button data-view="koleksi">Koleksi</button>
+    <button data-view="admin">Admin</button>
+  </nav>
+</div>
+
+<div id="modal" class="modal" hidden><div class="modal-card" id="modalCard"></div></div>
+<div id="printArea"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(() => {
+'use strict';
+/* =====================================================================
+   0. UTILITAS
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-5);
+const pct = x => Math.round(x * 100) + '%';
+function toast(msg, ms = 2800){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, ms); }
+function pill(text, cls, title){ const p = $('#enginePill'); p.textContent = text; p.className = 'pill ' + (cls || ''); p.title = title || text; }
+function f32ToB64(a){ const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+function b64ToF32(b){ const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return new Float32Array(u.buffer); }
+function blobToDataURL(b){ return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); }); }
+async function dataURLToBlob(d){ return (await fetch(d)).blob(); }
+function loadImage(src){ return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+
+/* =====================================================================
+   1. DATA BAWAAN — 8 TANAMAN
+   Warna bersifat indikatif; hasil celup bergantung pada konsentrasi,
+   jenis kain, jumlah celupan, dan fiksator.
+   ===================================================================== */
+const BG = '_latar';
+const IS_APP = !!window.IS_APP;
+const SEED = [
+{ id:'jolawe', nama:'Jolawe', latin:'Terminalia bellirica (Gaertn.) Roxb.', famili:'Combretaceae', lokal:'Jalawe, joho',
+  dye:'#A67C45', lokasi:'',
+  ringkas:'Pohon besar yang menggugurkan daun di musim kemarau, tingginya dapat mencapai 30 m. Buahnya sangat kaya tanin, sehingga dipakai sebagai pewarna sekaligus penguat ikatan warna pada kain.',
+  ciri:['Daun tunggal bulat telur terbalik, mengumpul di ujung ranting','Buah bulat telur sebesar kelereng besar, berbulu halus, coklat keabuan saat kering','Batang lurus dan tinggi, kulit kayu abu-abu kecoklatan'],
+  manfaat:['Buah dipakai dalam ramuan tradisional; di India menjadi salah satu dari tiga buah penyusun ramuan triphala','Rebusan buahnya dipakai sebagai perendam awal kain agar pewarna lain lebih kuat menempel'],
+  fakta:'Tanin jolawe bereaksi dengan besi dari tunjung menjadi warna gelap. Karena itu satu rebusan yang sama bisa menghasilkan krem kecoklatan atau abu-abu kehitaman, tergantung fiksatornya.',
+  pewarna:{ bagian:'Kulit buah (buah kering)', zat:'Tanin (galotanin, asam elagat)',
+    proses:'Buah kering ditumbuk kasar, direbus dengan perbandingan sekitar 1 : 10 hingga air tinggal separuh, lalu disaring. Kain dicelup berulang, dikeringkan di antara celupan, kemudian difiksasi.',
+    warna:[{f:'Tawas',n:'Krem kekuningan',hex:'#C9A45C'},{f:'Kapur',n:'Coklat muda',hex:'#9A6A3A'},{f:'Tunjung',n:'Abu-abu kehitaman',hex:'#4A4A42'}]},
+  media:[] },
+{ id:'mahoni', nama:'Mahoni', latin:'Swietenia mahagoni (L.) Jacq.', famili:'Meliaceae', lokal:'Mahoni; kerabatnya S. macrophylla (mahoni daun lebar)',
+  dye:'#8A4B2E', lokasi:'',
+  ringkas:'Pohon peneduh jalan asal Hindia Barat yang kayunya berwarna merah kecoklatan. Kulit batang dan serbuk kayunya memberi warna coklat kemerahan pada kain.',
+  ciri:['Daun majemuk menyirip genap; anak daun miring, tidak simetris di pangkal','Buah kotak keras bulat telur, tumbuh tegak ke atas, pecah menjadi lima katup','Biji pipih bersayap, berputar seperti baling-baling saat jatuh','Kulit batang beralur dan bersisik, coklat keabuan'],
+  manfaat:['Kayu untuk mebel, ukiran, dan panel','Biji dipakai dalam pengobatan tradisional; rasanya sangat pahit','Pohon peneduh yang tahan kondisi jalan perkotaan'],
+  fakta:'Buah mahoni pecah saat masih di pohon. Biji bersayapnya bisa melayang cukup jauh dari pohon induk.',
+  pewarna:{ bagian:'Kulit batang dan serbuk kayu', zat:'Tanin dan flavonoid',
+    proses:'Kulit batang dipotong kecil atau serbuk kayu direbus sampai larutan berwarna merah coklat pekat, lalu disaring. Celup berulang untuk warna yang lebih tua.',
+    warna:[{f:'Tawas',n:'Coklat muda kemerahan',hex:'#B07A55'},{f:'Kapur',n:'Coklat kemerahan',hex:'#8A4B2E'},{f:'Tunjung',n:'Coklat tua kehitaman',hex:'#4E3A2E'}]},
+  media:[] },
+{ id:'nangka', nama:'Nangka', latin:'Artocarpus heterophyllus Lam.', famili:'Moraceae', lokal:'Nongko (Jawa), nangka',
+  dye:'#D9A72E', lokasi:'',
+  ringkas:'Pohon buah asal India selatan yang buahnya termasuk buah pohon terbesar di dunia. Kayu terasnya yang kuning menghasilkan warna kuning pada kain.',
+  ciri:['Daun tunggal jorong, kaku, hijau tua mengilap di sisi atas','Seluruh bagian mengeluarkan getah putih lengket bila dilukai','Buah majemuk berduri tumpul, tumbuh langsung di batang dan cabang besar'],
+  manfaat:['Buah dan biji dimakan; nangka muda dimasak menjadi gudeg','Kayu dipakai untuk mebel dan badan kendang gamelan'],
+  fakta:'Serutan kayu nangka secara tradisional dipakai untuk mewarnai jubah biksu di Asia Tenggara.',
+  pewarna:{ bagian:'Kayu teras (serutan atau serbuk)', zat:'Morin dan artokarpin (flavonoid)',
+    proses:'Serutan kayu teras direndam semalam, direbus hingga larutan kuning pekat, lalu disaring. Tawas menjaga kuning tetap cerah.',
+    warna:[{f:'Tawas',n:'Kuning',hex:'#E0B63A'},{f:'Kapur',n:'Kuning tua kecoklatan',hex:'#C28A2C'},{f:'Tunjung',n:'Hijau zaitun',hex:'#7A7038'}]},
+  media:[] },
+{ id:'kesumba', nama:'Kesumba', latin:'Bixa orellana L.', famili:'Bixaceae', lokal:'Kesumba keling, galuga; internasional: annatto, achiote',
+  dye:'#E0692F', lokasi:'',
+  ringkas:'Perdu atau pohon kecil asal Amerika tropis. Selaput bijinya yang merah jingga dipakai sebagai pewarna kain dan pewarna makanan.',
+  ciri:['Daun tunggal berbentuk jantung dengan ujung meruncing, bertangkai panjang','Bunga merah muda keputihan','Buah kotak berambut duri lunak, merah saat muda, berisi banyak biji berselaput merah'],
+  manfaat:['Pewarna makanan alami untuk keju, mentega, dan olahan daging','Masyarakat adat Amerika memakainya sebagai cat tubuh'],
+  fakta:'Kode E160b pada label kemasan makanan adalah ekstrak biji kesumba (anato).',
+  pewarna:{ bagian:'Selaput biji', zat:'Biksin dan norbiksin (karotenoid)',
+    proses:'Biji direndam dalam air hangat yang sedikit dibasakan (misalnya air abu), diremas hingga selaput merahnya larut, lalu disaring. Warna mudah pudar oleh sinar matahari; celup ulang dan jemur di tempat teduh.',
+    warna:[{f:'Tanpa fiksasi',n:'Jingga',hex:'#E9803A'},{f:'Tawas',n:'Jingga kemerahan',hex:'#D0582E'},{f:'Tunjung',n:'Coklat jingga',hex:'#8A5A3A'}]},
+  media:[] },
+{ id:'indigofera', nama:'Indigofera', latin:'Indigofera tinctoria L.', famili:'Fabaceae', lokal:'Tom (Jawa), tarum (Sunda), nila',
+  dye:'#2F5E8E', lokasi:'',
+  ringkas:'Perdu kecil setinggi 1–2 m penghasil biru indigo alami, sumber warna biru tertua dalam batik dan tenun Nusantara.',
+  ciri:['Daun majemuk menyirip ganjil; anak daun kecil bulat telur terbalik','Bunga kecil merah muda keunguan tersusun dalam tandan','Buah polong kecil lurus'],
+  manfaat:['Sebagai legum, akarnya mengikat nitrogen sehingga menyuburkan tanah','Tanaman sela dan penutup tanah'],
+  fakta:'Kain yang baru diangkat dari bak indigo berwarna kuning kehijauan, lalu berubah biru dalam hitungan menit setelah terkena udara.',
+  pewarna:{ bagian:'Daun dan ranting muda', zat:'Indikan → indoksil → indigotin',
+    proses:'Daun direndam sekitar 24 jam hingga berfermentasi, ampas dibuang, larutan diberi kapur lalu diaduk kuat sampai berbuih agar teroksidasi, kemudian diendapkan menjadi pasta indigo. Pasta dilarutkan kembali dalam bak reduksi; kain dicelup lalu diangin-anginkan. Tua-mudanya biru ditentukan jumlah celupan, bukan fiksator.',
+    warna:[{f:'1–2 celupan',n:'Biru muda',hex:'#6F9BC4'},{f:'5–8 celupan',n:'Biru sedang',hex:'#2F5E8E'},{f:'10+ celupan',n:'Biru tua (nila)',hex:'#1C2B4A'}]},
+  media:[] },
+{ id:'jati', nama:'Jati', latin:'Tectona grandis L.f.', famili:'Lamiaceae', lokal:'Jati',
+  dye:'#8E4550', lokasi:'',
+  ringkas:'Pohon kayu mewah yang menggugurkan daun di musim kemarau. Daun mudanya mengandung pigmen merah yang memberi warna merah kecoklatan hingga keunguan.',
+  ciri:['Daun tunggal sangat besar, dapat lebih dari 30 cm, permukaan atas kasar seperti amplas','Daun muda kemerahan dan meninggalkan warna merah bila diremas','Bunga kecil keputihan dalam malai besar di ujung ranting','Batang lurus, kulit kayu coklat keabuan beralur'],
+  manfaat:['Kayu awet dan tahan rayap untuk bangunan, kapal, dan mebel','Daun dipakai membungkus makanan, misalnya nasi jamblang Cirebon'],
+  fakta:'Daun jati muda dipakai untuk memberi warna merah kecoklatan pada gudeg.',
+  pewarna:{ bagian:'Daun muda (pucuk kemerahan)', zat:'Antosianin',
+    proses:'Pucuk daun muda diremas atau dicacah, direbus sebentar hingga air berwarna merah, lalu disaring. Pakai segera karena antosianin mudah berubah warna.',
+    warna:[{f:'Tawas',n:'Merah muda kecoklatan',hex:'#B0656B'},{f:'Kapur',n:'Coklat kemerahan',hex:'#7E4A3A'},{f:'Tunjung',n:'Ungu keabuan',hex:'#5A4A52'}]},
+  media:[] },
+{ id:'mangga', nama:'Mangga', latin:'Mangifera indica L.', famili:'Anacardiaceae', lokal:'Pelem (Jawa), mangga',
+  dye:'#A9A548', lokasi:'',
+  ringkas:'Pohon buah asal Asia Selatan dengan tajuk rimbun berbentuk kubah. Daun tua dan kulit batangnya memberi warna kuning kehijauan hingga hijau.',
+  ciri:['Daun tunggal lanset panjang dengan tepi rata','Daun berbau khas getah bila diremas','Daun muda berwarna merah keunguan atau coklat kemerahan','Bunga kecil dalam malai di ujung ranting'],
+  manfaat:['Buah dimakan segar atau diolah','Kayu untuk papan dan peti','Daun muda dimakan sebagai lalapan'],
+  fakta:'Di India dahulu dibuat pigmen “kuning India” dari urine sapi yang diberi pakan daun mangga.',
+  pewarna:{ bagian:'Daun tua dan kulit batang', zat:'Mangiferin (santon) dan tanin',
+    proses:'Daun tua atau kulit batang dicacah, direbus hingga larutan kuning kecoklatan, lalu disaring. Tunjung menggeser warna ke arah hijau.',
+    warna:[{f:'Tawas',n:'Kuning kehijauan',hex:'#C9B85A'},{f:'Kapur',n:'Kuning kecoklatan',hex:'#A58A3E'},{f:'Tunjung',n:'Hijau tua',hex:'#5E6A3A'}]},
+  media:[] },
+{ id:'sawo-kecik', nama:'Sawo kecik', latin:'Manilkara kauki (L.) Dubard', famili:'Sapotaceae', lokal:'Sawo kecik, sawo jawa',
+  dye:'#9C7A4E', lokasi:'',
+  ringkas:'Pohon berumur panjang yang ditanam di halaman keraton dan rumah bangsawan Jawa. Namanya dimaknai “sarwo becik”, serba baik.',
+  ciri:['Daun tunggal bulat telur terbalik, mengumpul di ujung ranting','Sisi bawah daun keperakan atau putih kelabu; ciri paling mudah dikenali','Bergetah putih bila dilukai','Buah kecil lonjong, merah jingga kecoklatan saat masak'],
+  manfaat:['Kayu keras dan halus untuk warangka keris, gagang, dan ukiran','Buah dapat dimakan','Pohon peneduh bernilai filosofi dalam budaya Jawa'],
+  fakta:'Sawo kecik ditanam di halaman Keraton Yogyakarta dan Surakarta sebagai lambang harapan agar segala sesuatu menjadi baik.',
+  pewarna:{ bagian:'Kulit batang dan buah', zat:'Tanin',
+    proses:'Kulit batang dipotong kecil lalu direbus hingga larutan coklat, kemudian disaring. Pustaka tentang warna sawo kecik masih sedikit; catat hasil uji celup kebun Anda di sini.',
+    warna:[{f:'Tawas',n:'Coklat kekuningan',hex:'#C2A06A'},{f:'Kapur',n:'Coklat',hex:'#8E6A45'},{f:'Tunjung',n:'Coklat keabuan',hex:'#5A4E42'}]},
+  media:[] }
+];
+
+/* =====================================================================
+   2. PENYIMPANAN (IndexedDB, cadangan memori)
+   ===================================================================== */
+const DB = {
+  db:null, mem:{ kv:new Map(), plants:new Map(), samples:new Map(), media:new Map() },
+  open(){ return new Promise(res => { try{
+    const r = indexedDB.open('kebun-pewarna-ar', 1);
+    r.onupgradeneeded = () => { const d = r.result; ['kv','plants','samples','media'].forEach(s => { if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, {keyPath:'id'}); }); };
+    r.onsuccess = () => { this.db = r.result; res(true); };
+    r.onerror = () => res(false); r.onblocked = () => res(false);
+  }catch(e){ res(false); } }); },
+  _t(store, mode, op){ return new Promise((res, rej) => { const t = this.db.transaction(store, mode); const q = op(t.objectStore(store)); t.oncomplete = () => res(q && q.result); t.onerror = t.onabort = () => rej(t.error); }); },
+  put(st, v){ return this.db ? this._t(st, 'readwrite', s => s.put(v)) : (this.mem[st].set(v.id, v), Promise.resolve()); },
+  get(st, k){ return this.db ? this._t(st, 'readonly', s => s.get(k)) : Promise.resolve(this.mem[st].get(k)); },
+  del(st, k){ return this.db ? this._t(st, 'readwrite', s => s.delete(k)) : (this.mem[st].delete(k), Promise.resolve()); },
+  all(st){ return this.db ? this._t(st, 'readonly', s => s.getAll()) : Promise.resolve([...this.mem[st].values()]); },
+  clear(st){ return this.db ? this._t(st, 'readwrite', s => s.clear()) : (this.mem[st].clear(), Promise.resolve()); }
+};
+
+const DEF_SET = { pin:'1234', tau:0.70, mu:0.25, K:5, mode:'akurat', packUpdated:0, dirty:false };
+let SET = { ...DEF_SET };
+let PLANTS = [], SAMPLES = [], MEDIA = new Map();   // MEDIA: id -> {id, blob, type, name}
+const saveSet = () => DB.put('kv', { id:'settings', ...SET }).catch(()=>{});
+const plantById = id => PLANTS.find(p => p.id === id);
+const className = id => id === BG ? 'Latar (bukan target)' : (plantById(id)?.nama || id);
+const classColor = id => id === BG ? '#6B7688' : (plantById(id)?.dye || '#9DB7F0');
+async function markDirty(){ SET.dirty = true; await saveSet(); }
+
+/* =====================================================================
+   3. MESIN PENGENALAN
+   Jalur A — QR: identitas pasti (checksum + koreksi galat bawaan QR).
+   Jalur B — Visual: MobileNetV2 (ImageNet) → vektor 1280-d, dirata-rata
+             dengan versi cermin → k-NN kosinus per kelas → softmax →
+             gerbang keyakinan + gerbang selisih → voting antar-frame.
+   Cadangan — bila jaringan saraf gagal dimuat, deskriptor warna-tekstur-
+             tepi 104-d dengan alur keputusan yang sama.
+   ===================================================================== */
+const MODELS = {
+  akurat:{ id:'mnv2-100', label:'MobileNetV2 1.0', urls:['model/mobilenet_v2_100/model.json','https://storage.googleapis.com/teachable-machine-models/mobilenet_v2_weights_tf_dim_ordering_tf_kernels_1.0_224_no_top/model.json'] },
+  ringan:{ id:'mnv2-035', label:'MobileNetV2 0.35', urls:['model/mobilenet_v2_035/model.json','https://storage.googleapis.com/teachable-machine-models/mobilenet_v2_weights_tf_dim_ordering_tf_kernels_0.35_224_no_top/model.json'] }
+};
+function addScript(src){ return new Promise(r => { const s = document.createElement('script'); s.src = src; s.async = true; s.onload = () => r(true); s.onerror = () => { s.remove(); r(false); }; document.head.appendChild(s); }); }
+async function loadLib(srcs, check){ for (const s of srcs){ if (check()) return true; await addScript(s); } return check(); }
+
+const W224 = document.createElement('canvas'); W224.width = W224.height = 224;
+const W224x = W224.getContext('2d', { willReadFrequently:true });
+const HC = document.createElement('canvas'); HC.width = HC.height = 96;
+const HCx = HC.getContext('2d', { willReadFrequently:true });
+
+const Engine = {
+  kind:null, model:null, modelId:null, label:'', bd:null, ms:0, ready:false,
+  async init(){
+    pill(IS_APP ? 'Menyiapkan…' : 'Memuat mesin…', 'warn');
+    const qrP = loadLib(['lib/jsQR.js','https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'], () => typeof window.jsQR === 'function');
+    try{ if ('BarcodeDetector' in window){ const f = await BarcodeDetector.getSupportedFormats(); if (f.includes('qr_code')) this.bd = new BarcodeDetector({ formats:['qr_code'] }); } }catch(e){}
+    const tfOk = await loadLib(['lib/tf.min.js','https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js','https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.22.0/tf.min.js'], () => !!(window.tf && window.tf.loadLayersModel));
+    if (tfOk){
+      try{ await tf.setBackend('webgl'); }catch(e){ try{ await tf.setBackend('cpu'); }catch(_){} }
+      await tf.ready();
+      const cfg = IS_APP ? MODELS.akurat : (MODELS[SET.mode] || MODELS.akurat);
+      pill(IS_APP ? 'Menyiapkan…' : 'Mengunduh ' + cfg.label + '…', 'warn');
+      for (const u of cfg.urls){
+        try{ this.model = await tf.loadLayersModel(u); this.modelId = cfg.id; this.label = cfg.label; break; }
+        catch(e){ console.warn('Model tidak termuat dari', u, e); }
+      }
+      if (this.model){ tf.tidy(() => { this.model.predict(tf.zeros([2,224,224,3])).dataSync(); }); }
+    }
+    await qrP;
+    this.kind = this.model ? 'emb' : 'hc';
+    this.ready = true;
+    await reembed();
+    Index.build();
+    updatePill();
+  },
+  /** vektor MobileNet ter-normalisasi dari kanvas 224×224 (asli + cermin) */
+  embed(cnv){
+    if (!this.model) return null;
+    const t0 = performance.now();
+    const v = tf.tidy(() => {
+      const x = tf.browser.fromPixels(cnv).toFloat().div(127.5).sub(1).expandDims(0);
+      const b = tf.concat([x, tf.image.flipLeftRight(x)], 0);
+      const g = this.model.predict(b).mean([1,2]).mean(0);
+      return g.div(g.norm().add(1e-8));
+    });
+    const out = new Float32Array(v.dataSync()); v.dispose();
+    this.ms = performance.now() - t0;
+    return out;
+  }
+};
+function updatePill(){
+  const nE = Index.emb?.n || 0, nH = Index.hc?.n || 0;
+  if (!Engine.ready) return;
+  if (IS_APP){ pill('Siap', 'ok', (Engine.model ? Engine.label : 'mode ringan') + ' · ' + (nE || nH) + ' contoh'); return; }
+  if (Engine.model) pill('AI aktif · ' + nE + ' contoh', nE ? 'ok' : 'warn', Engine.label + ' aktif. Jalur QR: ' + (Engine.bd ? 'detektor bawaan' : (window.jsQR ? 'jsQR' : 'tidak tersedia')));
+  else pill('Mode ringan · ' + nH, 'warn', 'Jaringan saraf tidak termuat (tanpa internet?). Memakai deskriptor warna-tekstur.');
+}
+
+/** Deskriptor cadangan + ukuran mutu frame (terang & tajam) */
+function hcFeat(src){
+  HCx.drawImage(src, 0, 0, 96, 96);
+  const d = HCx.getImageData(0, 0, 96, 96).data, N = 96;
+  const gray = new Float32Array(N*N), cell = new Float32Array(60), glob = new Float32Array(24);
+  let lumSum = 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++){
+    const i = (y*N + x) * 4, r = d[i]/255, g = d[i+1]/255, b = d[i+2]/255;
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b), df = mx - mn;
+    let h = 0; if (df > 1e-6){ if (mx === r) h = ((g-b)/df) % 6; else if (mx === g) h = (b-r)/df + 2; else h = (r-g)/df + 4; h /= 6; if (h < 0) h += 1; }
+    const s = mx ? df/mx : 0, gy = 0.299*r + 0.587*g + 0.114*b;
+    gray[y*N + x] = gy; lumSum += gy;
+    const c = (y < N/2 ? 0 : 2) + (x < N/2 ? 0 : 1);
+    cell[c*15 + Math.min(11, (h*12)|0)] += s;
+    cell[c*15 + 12 + Math.min(2, (mx*3)|0)] += 1;
+    glob[Math.min(7, (h*8)|0)*3 + Math.min(2, (s*3)|0)] += 1;
+  }
+  const lbp = new Float32Array(10), ori = new Float32Array(8); let mS = 0, mS2 = 0, cnt = 0;
+  const nb = new Float32Array(8);
+  for (let y = 1; y < N-1; y++) for (let x = 1; x < N-1; x++){
+    const p = y*N + x, c = gray[p];
+    nb[0]=gray[p-N-1]; nb[1]=gray[p-N]; nb[2]=gray[p-N+1]; nb[3]=gray[p+1]; nb[4]=gray[p+N+1]; nb[5]=gray[p+N]; nb[6]=gray[p+N-1]; nb[7]=gray[p-1];
+    let bits = 0, trans = 0, prev = nb[7] >= c + 0.01;
+    for (let k = 0; k < 8; k++){ const bb = nb[k] >= c + 0.01; if (bb) bits++; if (bb !== prev) trans++; prev = bb; }
+    lbp[trans <= 2 ? bits : 9] += 1;
+    const gx = nb[2] + 2*nb[3] + nb[4] - nb[0] - 2*nb[7] - nb[6];
+    const gyy = nb[6] + 2*nb[5] + nb[4] - nb[0] - 2*nb[1] - nb[2];
+    const m = Math.hypot(gx, gyy); let a = Math.atan2(gyy, gx); if (a < 0) a += Math.PI;
+    ori[Math.min(7, (a/Math.PI*8)|0)] += m; mS += m; mS2 += m*m; cnt++;
+  }
+  const mean = mS/cnt, sd = Math.sqrt(Math.max(0, mS2/cnt - mean*mean));
+  const blocks = [[cell.subarray(0,15),1],[cell.subarray(15,30),1],[cell.subarray(30,45),1],[cell.subarray(45,60),1],[glob,1.2],[lbp,1],[ori,1],[new Float32Array([mean, sd]),0.5]];
+  const out = new Float32Array(104); let o = 0;
+  for (const [blk, w] of blocks){
+    let n = 0; const tmp = new Float32Array(blk.length);
+    for (let i = 0; i < blk.length; i++){ tmp[i] = Math.sqrt(Math.max(0, blk[i])); n += tmp[i]*tmp[i]; }
+    n = Math.sqrt(n) || 1;
+    for (let i = 0; i < blk.length; i++) out[o++] = tmp[i] / n * w;
+  }
+  let t = 0; for (let i = 0; i < out.length; i++) t += out[i]*out[i]; t = Math.sqrt(t) || 1;
+  for (let i = 0; i < out.length; i++) out[i] /= t;
+  return { vec:out, luma:lumSum/(N*N), sharp:mean };
+}
+
+/* ---------- indeks contoh latih ---------- */
+const Index = {
+  emb:null, hc:null,
+  build(){
+    for (const kind of ['emb','hc']){
+      const rows = SAMPLES.filter(s => s[kind] && (kind === 'hc' || s.embModel === Engine.modelId) && (s.plantId === BG || plantById(s.plantId)));
+      if (!rows.length){ this[kind] = { n:0 }; continue; }
+      const dim = rows[0][kind].length, M = new Float32Array(rows.length * dim);
+      rows.forEach((s, i) => M.set(s[kind], i*dim));
+      this[kind] = { n:rows.length, dim, M, lab:rows.map(s => s.plantId), ses:rows.map(s => s.session) };
+    }
+    updatePill();
+  }
+};
+const TEMP = { emb:0.035, hc:0.018 };
+/** skor per kelas = rerata 3 kemiripan tertinggi; lalu softmax */
+function classify(vec, kind, skipSession){
+  const I = Index[kind]; if (!I || !I.n) return null;
+  const top = new Map(); const { dim, M, lab, ses } = I;
+  for (let r = 0; r < I.n; r++){
+    if (skipSession && ses[r] === skipSession) continue;
+    let s = 0; const off = r*dim; for (let k = 0; k < dim; k++) s += vec[k] * M[off + k];
+    let arr = top.get(lab[r]); if (!arr){ arr = []; top.set(lab[r], arr); }
+    if (arr.length < 3){ arr.push(s); arr.sort((a,b) => b - a); } else if (s > arr[2]){ arr[2] = s; arr.sort((a,b) => b - a); }
+  }
+  if (!top.size) return null;
+  const T = TEMP[kind]; const ranked = [];
+  for (const [id, arr] of top) ranked.push({ id, s: arr.reduce((a,b) => a + b, 0) / arr.length });
+  const mx = Math.max(...ranked.map(r => r.s)); let z = 0;
+  for (const r of ranked){ r.e = Math.exp((r.s - mx) / T); z += r.e; }
+  for (const r of ranked) r.p = r.e / z;
+  ranked.sort((a,b) => b.p - a.p);
+  return { ranked, top:ranked[0].id, p:ranked[0].p, margin:ranked[0].p - (ranked[1]?.p || 0) };
+}
+function currentKind(){ return (Engine.model && Index.emb?.n) ? 'emb' : (Index.hc?.n ? 'hc' : null); }
+
+/* ---------- pelacak antar-frame ---------- */
+const Tracker = {
+  ema:new Map(), cand:null, streak:0, cool:new Map(),
+  reset(){ this.ema.clear(); this.cand = null; this.streak = 0; },
+  feed(res){
+    const a = 0.45, seen = new Set();
+    for (const r of res.ranked){ const o = this.ema.get(r.id) || 0; this.ema.set(r.id, o + (r.p - o) * a); seen.add(r.id); }
+    for (const [k, v] of this.ema) if (!seen.has(k)) this.ema.set(k, v * (1 - a));
+    const arr = [...this.ema].sort((x, y) => y[1] - x[1]);
+    const [c, p] = arr[0]; const p2 = arr[1] ? arr[1][1] : 0;
+    const cooling = (this.cool.get(c) || 0) > performance.now();
+    const ok = c !== BG && p >= SET.tau && (p - p2) >= SET.mu && res.top === c && !cooling;
+    if (ok){ if (this.cand === c) this.streak = Math.min(this.streak + 1, SET.K * 3); else { this.cand = c; this.streak = 1; } }
+    else { this.streak = Math.max(0, this.streak - 1); if (!this.streak) this.cand = null; }
+    return { c, p, p2, ok, streak:this.streak, locked: ok && this.streak >= SET.K };
+  }
+};
+
+/* ---------- QR ---------- */
+function parseQR(text){
+  if (!text) return null; let t = String(text).trim();
+  if (t.includes('#')) t = t.slice(t.lastIndexOf('#') + 1);
+  if (/^KPAR:/i.test(t)) t = t.slice(5);
+  t = decodeURIComponent(t).toLowerCase();
+  return plantById(t) ? t : null;
+}
+const QRC = document.createElement('canvas'); const QRx = QRC.getContext('2d', { willReadFrequently:true });
+async function detectQR(video){
+  const vw = video.videoWidth, vh = video.videoHeight; if (!vw) return null;
+  if (Engine.bd){
+    try{ const r = await Engine.bd.detect(video); if (r.length) return { text:r[0].rawValue, pts:r[0].cornerPoints.map(p => [p.x, p.y]) }; }catch(e){}
+    return null;
+  }
+  if (typeof window.jsQR !== 'function') return null;
+  const sc = Math.min(1, 640 / Math.max(vw, vh)); const w = Math.round(vw*sc), h = Math.round(vh*sc);
+  if (QRC.width !== w){ QRC.width = w; QRC.height = h; }
+  QRx.drawImage(video, 0, 0, w, h);
+  const r = jsQR(QRx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts:'attemptBoth' });
+  if (!r) return null; const L = r.location;
+  return { text:r.data, pts:[L.topLeftCorner, L.topRightCorner, L.bottomRightCorner, L.bottomLeftCorner].map(p => [p.x/sc, p.y/sc]) };
+}
+
+/* =====================================================================
+   4. KAMERA
+   ===================================================================== */
+const Cam = {
+  stream:null, track:null, devices:[], devIdx:-1, torchOn:false, targets:new Set(),
+  async start(deviceId){
+    this.stop();
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){ $('#noSecure').hidden = false; throw new Error('insecure'); }
+    const v = deviceId ? { deviceId:{ exact:deviceId } } : { facingMode:{ ideal:'environment' } };
+    Object.assign(v, { width:{ ideal:1280 }, height:{ ideal:720 } });
+    this.stream = await navigator.mediaDevices.getUserMedia({ video:v, audio:false });
+    this.track = this.stream.getVideoTracks()[0];
+    try{ this.devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); }catch(e){ this.devices = []; }
+    const cur = this.track.getSettings?.().deviceId; this.devIdx = this.devices.findIndex(d => d.deviceId === cur);
+    for (const vEl of this.targets){ vEl.srcObject = this.stream; vEl.play().catch(()=>{}); }
+    const caps = this.track.getCapabilities?.() || {};
+    $('#btnTorch').hidden = !caps.torch; $('#btnFlip').hidden = this.devices.length < 2;
+    this.torchOn = false; $('#btnTorch').classList.remove('on');
+  },
+  attach(vEl){ this.targets.add(vEl); if (this.stream){ vEl.srcObject = this.stream; vEl.play().catch(()=>{}); } },
+  stop(){ if (this.stream) this.stream.getTracks().forEach(t => t.stop()); this.stream = null; this.track = null; for (const vEl of this.targets) vEl.srcObject = null; },
+  async torch(){ if (!this.track) return; this.torchOn = !this.torchOn; try{ await this.track.applyConstraints({ advanced:[{ torch:this.torchOn }] }); }catch(e){ this.torchOn = false; } $('#btnTorch').classList.toggle('on', this.torchOn); },
+  async flip(){ if (this.devices.length < 2) return; const n = this.devices[(this.devIdx + 1) % this.devices.length]; await this.start(n.deviceId); }
+};
+/** peta koordinat video ↔ layar untuk video object-fit:cover */
+function viewMap(video, box){
+  const W = box.clientWidth, H = box.clientHeight, vw = video.videoWidth || 1, vh = video.videoHeight || 1;
+  const s = Math.max(W / vw, H / vh);
+  return { W, H, s, ox:(W - vw*s)/2, oy:(H - vh*s)/2 };
+}
+function reticle(box){ const W = box.clientWidth, H = box.clientHeight; const side = Math.min(W, H) * 0.72; return { x:(W - side)/2, y:(H - side)/2 - Math.min(H*0.04, 20), side }; }
+function grabReticle(video, box){
+  const m = viewMap(video, box), R = reticle(box);
+  let sx = (R.x - m.ox)/m.s, sy = (R.y - m.oy)/m.s, sw = R.side/m.s;
+  sx = Math.max(0, Math.min(sx, video.videoWidth - sw)); sy = Math.max(0, Math.min(sy, video.videoHeight - sw));
+  W224x.drawImage(video, sx, sy, sw, sw, 0, 0, 224, 224);
+  return W224;
+}
+function fitCanvas(cv, box){ const dpr = Math.min(2, window.devicePixelRatio || 1); const w = Math.round(box.clientWidth*dpr), h = Math.round(box.clientHeight*dpr); if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; } const x = cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); return x; }
+function drawBrackets(x, R, color, progress){
+  const L = Math.min(34, R.side*0.14), r = R.x, t = R.y, s = R.side;
+  x.lineWidth = 4; x.lineCap = 'round'; x.strokeStyle = color; x.beginPath();
+  x.moveTo(r, t+L); x.lineTo(r, t); x.lineTo(r+L, t);
+  x.moveTo(r+s-L, t); x.lineTo(r+s, t); x.lineTo(r+s, t+L);
+  x.moveTo(r+s, t+s-L); x.lineTo(r+s, t+s); x.lineTo(r+s-L, t+s);
+  x.moveTo(r+L, t+s); x.lineTo(r, t+s); x.lineTo(r, t+s-L); x.stroke();
+  if (progress > 0){ x.lineWidth = 3; x.strokeStyle = color; x.beginPath(); x.moveTo(r + 8, t + s + 10); x.lineTo(r + 8 + (s - 16) * Math.min(1, progress), t + s + 10); x.stroke(); }
+}
+
+/* =====================================================================
+   5. PINDAI (AR)
+   ===================================================================== */
+const Scan = { running:false, busy:false, last:null, lockedId:null, lockSrc:null, qrPts:null, qrSeen:0, frames:0 };
+const video = $('#cam'), stage = $('#stage'), ov = $('#ov');
+Cam.attach(video);
+function scanPaused(){ return document.hidden || currentView !== 'scan' || $('#sheet').classList.contains('full'); }
+function setHint(t){ const h = $('#hint'); if (h.textContent !== t) h.textContent = t; }
+
+async function scanLoop(){
+  if (!Scan.running) return;
+  const t0 = performance.now();
+  if (!scanPaused() && video.videoWidth && !Scan.busy){
+    Scan.busy = true;
+    try{ await scanStep(); }catch(e){ console.warn(e); }
+    Scan.busy = false;
+  }
+  const budget = Math.max(90, Engine.ms * 1.4);
+  setTimeout(scanLoop, Math.max(20, budget - (performance.now() - t0)));
+}
+async function scanStep(){
+  Scan.frames++;
+  // Jalur A: QR
+  const q = await detectQR(video);
+  const qid = q && parseQR(q.text);
+  if (qid){
+    Scan.qrPts = q.pts; Scan.qrSeen = performance.now();
+    Tracker.reset(); renderCands(null);
+    const cooling = (Tracker.cool.get(qid) || 0) > performance.now();
+    if (!cooling && (Scan.lockedId !== qid || Scan.lockSrc !== 'qr')) openSheet(qid, 'qr', 1);
+    setHint('Label QR terbaca · ' + className(qid));
+    drawScan(null); return;
+  }
+  if (q && !qid){ setHint('QR terbaca, tetapi bukan label kebun ini.'); }
+  if (performance.now() - Scan.qrSeen > 600) Scan.qrPts = null;
+
+  // Jalur B: visual
+  const crop = grabReticle(video, stage);
+  const hc = hcFeat(crop);
+  if (hc.luma < 0.10){ setHint('Terlalu gelap. Nyalakan senter atau cari cahaya.'); drawScan(null); return; }
+  if (hc.sharp < 0.03){ setHint('Gambar kabur. Tahan ponsel diam sejenak.'); drawScan(null); return; }
+  const kind = currentKind();
+  if (!kind){ setHint(IS_APP ? 'Arahkan kotak ke label QR di papan nama tanaman.' : (Engine.ready ? 'Belum ada contoh latih. Hanya label QR yang aktif.' : 'Mesin sedang dimuat… label QR sudah bisa dipindai.')); drawScan(null); return; }
+  const vec = kind === 'emb' ? Engine.embed(crop) : hc.vec;
+  const res = classify(vec, kind);
+  if (!res){ drawScan(null); return; }
+  const tr = Tracker.feed(res);
+  Scan.last = { res, tr };
+  renderCands(res);
+  if (tr.locked && (Scan.lockedId !== tr.c || Scan.lockSrc !== 'visual')){ openSheet(tr.c, 'visual', tr.p); }
+  if (tr.c === BG || !tr.ok){
+    if (!Scan.lockedId) setHint(tr.c === BG ? 'Tidak dikenali. Arahkan kotak ke daun, ranting, atau batang.' : 'Belum yakin… dekatkan ke daun atau ubah sudut.');
+  } else if (Scan.lockedId === tr.c) setHint(className(tr.c) + ' dikenali · ketuk “Baca infografis lengkap”');
+  else setHint('Mengenali ' + className(tr.c) + ' · ' + Math.min(tr.streak, SET.K) + '/' + SET.K);
+  drawScan(tr);
+}
+function drawScan(tr){
+  const x = fitCanvas(ov, stage); const W = stage.clientWidth, H = stage.clientHeight; x.clearRect(0, 0, W, H);
+  const R = reticle(stage);
+  let col = 'rgba(237,240,244,.85)', prog = 0;
+  if (tr && tr.ok){ col = '#F2C14E'; prog = tr.streak / SET.K; }
+  if (Scan.lockedId && Scan.lockSrc === 'visual' && tr && tr.c === Scan.lockedId && tr.ok){ col = classColor(Scan.lockedId); prog = 1; }
+  if (Scan.qrPts){
+    const m = viewMap(video, stage); const P = Scan.qrPts.map(([a, b]) => [a*m.s + m.ox, b*m.s + m.oy]);
+    const c = classColor(Scan.lockedId);
+    x.fillStyle = c + '33'; x.strokeStyle = c; x.lineWidth = 4; x.beginPath(); P.forEach(([a,b], i) => i ? x.lineTo(a,b) : x.moveTo(a,b)); x.closePath(); x.fill(); x.stroke();
+    const cx = P.reduce((s, p) => s + p[0], 0)/4, cy = Math.max(...P.map(p => p[1]));
+    const sh = $('#sheet'); const top = sh.hidden ? H : H - sh.offsetHeight;
+    x.setLineDash([6, 6]); x.lineWidth = 2; x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx, Math.max(cy + 10, top - 4)); x.stroke(); x.setLineDash([]);
+    x.fillStyle = c; x.beginPath(); x.arc(cx, cy, 6, 0, Math.PI*2); x.fill();
+    return;
+  }
+  drawBrackets(x, R, col, prog);
+  if (tr && tr.ok){
+    const label = className(tr.c) + '  ' + pct(tr.p);
+    x.font = '600 14px Figtree, system-ui, sans-serif'; const w = x.measureText(label).width + 20;
+    const lx = R.x + R.side/2 - w/2, ly = R.y - 38;
+    x.fillStyle = 'rgba(10,14,20,.8)'; x.beginPath(); x.roundRect ? x.roundRect(lx, ly, w, 28, 14) : x.rect(lx, ly, w, 28); x.fill();
+    x.fillStyle = col; x.fillText(label, lx + 10, ly + 19);
+  }
+}
+function renderCands(res){
+  const el = $('#cands');
+  if (!res){ el.innerHTML = ''; return; }
+  el.innerHTML = res.ranked.slice(0, 3).map(r => `<div class="cand" style="--c:${classColor(r.id)}"><span>${esc(className(r.id))}</span><span class="mono">${pct(r.p)}</span><i><b style="width:${Math.max(2, r.p*100)}%"></b></i></div>`).join('');
+}
+async function startCamera(){
+  try{
+    await Cam.start();
+    $('#btnStart').hidden = true; $('#camBlock').hidden = true;
+    if (!Scan.running){ Scan.running = true; scanLoop(); }
+    setHint('Arahkan kotak ke daun, ranting, atau label QR.');
+  }catch(e){
+    if (e.message === 'insecure') return;
+    if (IS_APP){ $('#camBlock').hidden = false; $('#camSettings').hidden = !(window.KebunApp && KebunApp.openSettings); return; }
+    toast(e.name === 'NotAllowedError' ? 'Izin kamera ditolak. Izinkan kamera di pengaturan peramban.' : 'Kamera tidak bisa dibuka: ' + (e.message || e.name));
+  }
+}
+$('#camRetry').onclick = startCamera;
+$('#camSettings').onclick = () => { try{ KebunApp.openSettings(); }catch(e){} };
+/* Panduan singkat sekali tampil */
+function coachSeen(){ try{ return localStorage.getItem('kpar-coach') === '1'; }catch(e){ return false; } }
+$('#coachOk').onclick = () => { try{ localStorage.setItem('kpar-coach', '1'); }catch(e){} $('#coach').hidden = true; if (IS_APP || !Cam.stream) startCamera(); };
+/* Kait untuk aplikasi Android: tombol kembali, jeda, lanjut */
+window.__appBack = () => {
+  if (!$('#modal').hidden){ $('#modal').hidden = true; $('#modalCard').innerHTML = ''; return true; }
+  const sh = $('#sheet');
+  if (!sh.hidden && sh.classList.contains('full')){ sh.className = 'sheet peek'; return true; }
+  if (!sh.hidden){ closeSheet(); return true; }
+  if (currentView !== 'scan'){ showView('scan'); return true; }
+  return false;
+};
+window.__appPause = () => { if (Cam.stream){ Scan.wasOn = true; Cam.stop(); } };
+window.__appResume = () => { if (Scan.wasOn || !$('#camBlock').hidden){ Scan.wasOn = false; startCamera(); } };
+$('#btnStart').onclick = startCamera;
+$('#btnTorch').onclick = () => Cam.torch();
+$('#btnFlip').onclick = () => Cam.flip().catch(() => toast('Gagal berganti kamera'));
+
+/* ---------- lembar infografis ---------- */
+function srcLabel(src, conf){
+  if (src === 'qr') return 'Label QR · pasti';
+  if (src === 'visual') return 'Dikenali visual · ' + pct(conf);
+  if (src === 'tautan') return 'Dibuka dari tautan';
+  return 'Koleksi';
+}
+function mediaHTML(p){
+  if (!p.media?.length) return '<p class="muted">Belum ada gambar atau video. Admin dapat menambahkannya di menu Infografis.</p>';
+  return '<div class="media">' + p.media.map(m => {
+    const cap = m.cap ? `<figcaption>${esc(m.cap)}</figcaption>` : '';
+    if (m.url){
+      const yt = m.url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{6,})/);
+      if (yt) return `<figure><iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}" title="${esc(m.cap || 'Video')}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>${cap}</figure>`;
+      if (/\.(mp4|webm|mov)(\?|$)/i.test(m.url)) return `<figure><video src="${esc(m.url)}" controls playsinline preload="metadata"></video>${cap}</figure>`;
+      return `<figure><img src="${esc(m.url)}" alt="${esc(m.cap || p.nama)}" loading="lazy">${cap}</figure>`;
+    }
+    const rec = MEDIA.get(m.id); if (!rec) return '';
+    const u = mediaURL(rec);
+    return rec.type.startsWith('video') ? `<figure><video src="${u}" controls playsinline preload="metadata"></video>${cap}</figure>` : `<figure><img src="${u}" alt="${esc(m.cap || p.nama)}">${cap}</figure>`;
+  }).join('') + '</div>';
+}
+const _urls = new Map();
+function mediaURL(rec){ if (!_urls.has(rec.id)) _urls.set(rec.id, URL.createObjectURL(rec.blob)); return _urls.get(rec.id); }
+function infoHTML(p, src, conf){
+  const w = p.pewarna || {}; const cols = (w.warna || []);
+  const bar = cols.length ? cols.map(c => `<span style="background:${esc(c.hex)}"></span>`).join('') : `<span style="background:${esc(p.dye)}"></span>`;
+  return `<div class="info" style="--dye:${esc(p.dye)}">
+    <div class="ihead">
+      <div><span class="src">${esc(srcLabel(src, conf))}</span><h2>${esc(p.nama)}</h2><div class="latin">${esc(p.latin)}</div><small>${esc([p.famili, p.lokal].filter(Boolean).join(' · '))}</small></div>
+      <div class="ihead-act"><button class="iconbtn" data-act="close" aria-label="Tutup">×</button></div>
+    </div>
+    <div class="dyebar" aria-hidden="true">${bar}</div>
+    <button class="expand" data-act="expand">Baca infografis lengkap</button>
+    <div class="ibody">
+      <nav class="itabs">
+        <button data-t="r" class="on">Ringkas</button><button data-t="w">Warna</button><button data-t="c">Ciri</button><button data-t="m">Media${p.media?.length ? ' (' + p.media.length + ')' : ''}</button>
+      </nav>
+      <div class="ipanes">
+        <div class="ipane" data-p="r">
+          <p>${esc(p.ringkas)}</p>
+          ${p.lokasi ? `<dl class="kv"><dt>Lokasi</dt><dd>${esc(p.lokasi)}</dd></dl>` : ''}
+          ${p.manfaat?.length ? `<div style="display:grid;gap:6px"><h4>Manfaat lain</h4><ul>${p.manfaat.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>` : ''}
+          ${p.fakta ? `<div class="fact">${esc(p.fakta)}</div>` : ''}
+        </div>
+        <div class="ipane" data-p="w" hidden>
+          <dl class="kv"><dt>Bagian</dt><dd>${esc(w.bagian || '—')}</dd><dt>Zat warna</dt><dd>${esc(w.zat || '—')}</dd></dl>
+          <div class="swatches">${cols.map(c => `<div class="sw" style="--c:${esc(c.hex)}"><i></i><div><b>${esc(c.f)}</b>${esc(c.n)}<br><span class="mono muted" style="font-size:11px">${esc(c.hex.toUpperCase())}</span></div></div>`).join('')}</div>
+          ${w.proses ? `<div style="display:grid;gap:6px"><h4>Cara ekstraksi</h4><p>${esc(w.proses)}</p></div>` : ''}
+          <p class="note">Warna di atas indikatif. Hasil nyata bergantung pada konsentrasi larutan, jenis kain, jumlah celupan, dan fiksator.</p>
+        </div>
+        <div class="ipane" data-p="c" hidden><ul>${(p.ciri || []).map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
+        <div class="ipane" data-p="m" hidden>${mediaHTML(p)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+function wireInfo(root, onClose, onExpand){
+  root.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.act === 'close') onClose();
+    else if (b.dataset.act === 'expand') onExpand && onExpand();
+    else if (b.dataset.t){ $$('.itabs button', root).forEach(x => x.classList.toggle('on', x === b)); $$('.ipane', root).forEach(pn => pn.hidden = pn.dataset.p !== b.dataset.t); }
+  });
+}
+function openSheet(id, src, conf){
+  const p = plantById(id); if (!p) return;
+  const sh = $('#sheet');
+  sh.innerHTML = '<div class="grab" aria-hidden="true"></div>' + infoHTML(p, src, conf);
+  sh.hidden = false; sh.className = 'sheet peek';
+  Scan.lockedId = id; Scan.lockSrc = src;
+  if (navigator.vibrate) try{ navigator.vibrate(30); }catch(e){}
+}
+function closeSheet(){
+  const sh = $('#sheet'); if (Scan.lockedId) Tracker.cool.set(Scan.lockedId, performance.now() + 2500);
+  sh.hidden = true; sh.innerHTML = ''; Scan.lockedId = null; Scan.lockSrc = null; Tracker.reset();
+}
+wireInfo($('#sheet'), closeSheet, () => { $('#sheet').className = 'sheet full'; });
+$('#sheet').addEventListener('click', e => { if (e.target.classList.contains('grab')){ const s = $('#sheet'); s.className = s.classList.contains('full') ? 'sheet peek' : 'sheet full'; } });
+
+/* =====================================================================
+   6. NAVIGASI, KOLEKSI, MODAL
+   ===================================================================== */
+let currentView = 'scan';
+function showView(v){
+  currentView = v;
+  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
+  ['scan','koleksi','admin'].forEach(k => $('#v-' + k).hidden = k !== v);
+  if (v === 'koleksi') renderGrid();
+  if (v === 'admin' && !$('#adminBody').hidden) refreshAdmin();
+}
+$$('#nav button').forEach(b => b.onclick = () => showView(b.dataset.view));
+
+function trainStat(id){
+  const s = SAMPLES.filter(x => x.plantId === id); const ses = new Set(s.map(x => x.session)).size;
+  return { n:s.length, ses, cls: s.length >= 30 && ses >= 3 ? 'ok' : (s.length >= 10 ? 'warn' : 'bad') };
+}
+function renderGrid(){
+  $('#grid').innerHTML = PLANTS.map(p => {
+    const st = trainStat(p.id); const cols = (p.pewarna?.warna || []);
+    return `<button class="pcard" data-id="${esc(p.id)}">
+      <div class="strip">${(cols.length ? cols : [{hex:p.dye}]).map(c => `<span style="background:${esc(c.hex)}"></span>`).join('')}</div>
+      <div class="body"><h3>${esc(p.nama)}</h3><span class="latin">${esc(p.latin)}</span><span class="muted" style="font-size:13px">${esc(p.pewarna?.bagian || '')}</span>
+      <div class="meta webonly"><span class="chip ok">QR siap</span><span class="chip ${st.cls}">Visual: ${st.n} contoh</span></div></div>
+    </button>`;
+  }).join('');
+}
+$('#grid').addEventListener('click', e => { const c = e.target.closest('.pcard'); if (c) openModal(c.dataset.id, 'koleksi'); });
+function openModal(id, src){
+  const p = plantById(id); if (!p) return;
+  const mc = $('#modalCard'); mc.innerHTML = infoHTML(p, src, 1);
+  mc.querySelector('.expand')?.remove();
+  $('#modal').hidden = false;
+}
+wireInfo($('#modalCard'), () => { $('#modal').hidden = true; $('#modalCard').innerHTML = ''; });
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal'){ $('#modal').hidden = true; $('#modalCard').innerHTML = ''; } });
+
+/* =====================================================================
+   7. ADMIN — gerbang & tab
+   ===================================================================== */
+$('#btnGate').onclick = () => {
+  if ($('#pinIn').value === String(SET.pin)){ $('#gate').hidden = true; $('#adminBody').hidden = false; $('#pinIn').value = ''; refreshAdmin(); }
+  else toast('PIN belum cocok');
+};
+$('#pinIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btnGate').click(); });
+let adminTab = 'latih';
+$('#atabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return; adminTab = b.dataset.tab;
+  $$('#atabs button').forEach(x => x.classList.toggle('on', x === b));
+  ['latih','info','uji','qr','paket'].forEach(t => $('#tab-' + t).hidden = t !== adminTab);
+  refreshAdmin();
+});
+function refreshAdmin(){
+  fillSelects();
+  if (adminTab === 'latih'){ renderTrainTable(); renderThumbs(); }
+  if (adminTab === 'info') loadEditor();
+  if (adminTab === 'qr') renderLabels();
+  if (adminTab === 'paket') loadSettingsForm();
+}
+function fillSelects(){
+  const opts = PLANTS.map(p => `<option value="${esc(p.id)}">${esc(p.nama)}</option>`).join('');
+  const tc = $('#trainClass'), cur = tc.value; tc.innerHTML = opts + `<option value="${BG}">Latar (bukan target)</option>`; if (cur && [...tc.options].some(o => o.value === cur)) tc.value = cur;
+  const ep = $('#ePlant'), cur2 = ep.value; ep.innerHTML = opts; if (cur2 && plantById(cur2)) ep.value = cur2;
+}
+
+/* ---------- LATIH ---------- */
+const tvideo = $('#tcam'), tstage = $('#tStage'), tov = $('#tov');
+Cam.attach(tvideo);
+let tLoopOn = false, lastSingle = { plant:null, t:0, session:null };
+$('#tCam').onclick = async () => {
+  try{
+    if (!Cam.stream) await Cam.start();
+    $('#tPill').textContent = 'Kamera menyala'; $('#tPill').className = 'pill ok tpill';
+    $('#tOne').disabled = $('#tBurst').disabled = false;
+    if (!Scan.running){ Scan.running = true; scanLoop(); $('#btnStart').hidden = true; }
+    if (!tLoopOn){ tLoopOn = true; (function draw(){ if (currentView === 'admin' && adminTab === 'latih'){ const x = fitCanvas(tov, tstage); x.clearRect(0,0,tstage.clientWidth,tstage.clientHeight); drawBrackets(x, reticle(tstage), classColor($('#trainClass').value), 0); } requestAnimationFrame(draw); })(); }
+  }catch(e){ if (e.message !== 'insecure') toast('Kamera tidak bisa dibuka: ' + (e.message || e.name)); else toast('Kamera butuh alamat https://'); }
+};
+async function makeSample(canvas224, plantId, session){
+  const img = canvas224.toDataURL('image/jpeg', 0.86);
+  const hc = hcFeat(canvas224).vec;
+  const emb = Engine.model ? Engine.embed(canvas224) : null;
+  const s = { id:uid(), plantId, session, t:Date.now(), img, hc, emb, embModel: emb ? Engine.modelId : null };
+  await DB.put('samples', s); SAMPLES.push(s);
+  return s;
+}
+function afterTrainChange(){ Index.build(); renderTrainTable(); renderThumbs(); markDirty(); }
+$('#tOne').onclick = async () => {
+  if (!tvideo.videoWidth) return;
+  const pid = $('#trainClass').value, now = Date.now();
+  if (lastSingle.plant !== pid || now - lastSingle.t > 60000) lastSingle.session = 's-' + uid();
+  lastSingle.plant = pid; lastSingle.t = now;
+  await makeSample(grabReticle(tvideo, tstage), pid, lastSingle.session);
+  afterTrainChange(); toast('1 contoh direkam untuk ' + className(pid), 1200);
+};
+$('#tBurst').onclick = async () => {
+  if (!tvideo.videoWidth) return;
+  const pid = $('#trainClass').value, ses = 'b-' + uid(), b = $('#tBurst'); b.disabled = true;
+  for (let i = 0; i < 12; i++){
+    b.textContent = `Merekam ${i + 1}/12 — gerakkan pelan`;
+    await makeSample(grabReticle(tvideo, tstage), pid, ses);
+    await sleep(320);
+  }
+  b.textContent = 'Rekam beruntun (12)'; b.disabled = false; lastSingle.plant = null;
+  afterTrainChange(); toast('12 contoh (1 sesi) untuk ' + className(pid));
+};
+$('#tUpload').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+  const pid = $('#trainClass').value, ses = 'u-' + uid(); let n = 0;
+  for (const f of files){
+    try{
+      const url = URL.createObjectURL(f); const im = await loadImage(url);
+      const w = im.naturalWidth, h = im.naturalHeight, side = Math.min(w, h);
+      for (const k of [1, 0.7]){ const sw = side*k; W224x.drawImage(im, (w - sw)/2, (h - sw)/2, sw, sw, 0, 0, 224, 224); await makeSample(W224, pid, ses); n++; }
+      URL.revokeObjectURL(url);
+    }catch(err){ console.warn(err); }
+  }
+  afterTrainChange(); toast(n + ' contoh dari ' + files.length + ' foto untuk ' + className(pid));
+};
+$('#trainClass').onchange = () => renderThumbs();
+function renderTrainTable(){
+  const ids = [...PLANTS.map(p => p.id), BG];
+  const rows = ids.map(id => {
+    const st = trainStat(id), goal = id === BG ? 'ok' : st.cls;
+    const status = id === BG ? (st.n >= 20 ? 'Cukup' : 'Tambah foto latar') : (goal === 'ok' ? 'Siap' : (goal === 'warn' ? (st.ses < 3 ? 'Tambah sesi' : 'Tambah contoh') : 'Kurang'));
+    const cls = id === BG ? (st.n >= 20 ? 'ok' : 'warn') : goal;
+    return `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${classColor(id)};margin-right:8px"></span>${esc(className(id))}</td><td class="n">${st.n}</td><td class="n">${st.ses}</td><td><span class="chip ${cls}">${status}</span></td></tr>`;
+  }).join('');
+  $('#trainTable').innerHTML = `<table><thead><tr><th>Kelas</th><th class="n">Contoh</th><th class="n">Sesi</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function renderThumbs(){
+  const pid = $('#trainClass').value || PLANTS[0]?.id;
+  const list = SAMPLES.filter(s => s.plantId === pid).sort((a, b) => b.t - a.t);
+  $('#thumbTitle').textContent = 'Contoh: ' + className(pid) + ' (' + list.length + ')';
+  const sesIdx = new Map(); [...new Set(list.map(s => s.session))].reverse().forEach((s, i) => sesIdx.set(s, i + 1));
+  $('#thumbs').innerHTML = list.length ? list.map(s => `<div class="thumb"><img src="${s.img}" alt=""><span>S${sesIdx.get(s.session)}</span><button data-del="${s.id}" aria-label="Hapus contoh">×</button></div>`).join('') : '<p class="muted" style="grid-column:1/-1">Belum ada contoh.</p>';
+}
+$('#thumbs').addEventListener('click', async e => {
+  const b = e.target.closest('[data-del]'); if (!b) return;
+  await DB.del('samples', b.dataset.del); SAMPLES = SAMPLES.filter(s => s.id !== b.dataset.del); afterTrainChange();
+});
+
+/** hitung ulang vektor bila model berganti atau sampel impor belum punya vektor */
+async function reembed(){
+  const need = SAMPLES.filter(s => (Engine.model && s.embModel !== Engine.modelId) || !s.hc);
+  if (!need.length) return;
+  let i = 0;
+  for (const s of need){
+    i++; if (i % 8 === 0){ pill(IS_APP ? 'Menyiapkan… ' + Math.round(i / need.length * 100) + '%' : 'Menyiapkan contoh latih ' + i + '/' + need.length, 'warn'); await sleep(0); }
+    try{
+      const im = await loadImage(s.img); W224x.drawImage(im, 0, 0, 224, 224);
+      if (!s.hc) s.hc = hcFeat(W224).vec;
+      if (Engine.model){ s.emb = Engine.embed(W224); s.embModel = Engine.modelId; }
+      await DB.put('samples', s);
+    }catch(e){ console.warn('reembed', e); }
+  }
+}
+
+/* ---------- INFOGRAFIS ---------- */
+let editId = null, pendingMedia = [];
+function warnaRow(c = { f:'', n:'', hex:'#999999' }){
+  return `<div class="wrow"><label class="f">Fiksasi / kondisi<input data-k="f" value="${esc(c.f)}"></label><label class="f">Nama warna<input data-k="n" value="${esc(c.n)}"></label><label class="f">Warna<input data-k="hex" type="color" value="${esc(c.hex)}"></label><button class="iconbtn" data-rm aria-label="Hapus baris">×</button></div>`;
+}
+function loadEditor(){
+  const id = $('#ePlant').value || PLANTS[0]?.id; if (!id) return; editId = id; $('#ePlant').value = id;
+  const p = plantById(id); const w = p.pewarna || {};
+  $('#eNama').value = p.nama || ''; $('#eLatin').value = p.latin || ''; $('#eFamili').value = p.famili || ''; $('#eLokal').value = p.lokal || '';
+  $('#eLokasi').value = p.lokasi || ''; $('#eRingkas').value = p.ringkas || ''; $('#eCiri').value = (p.ciri || []).join('\n');
+  $('#eManfaat').value = (p.manfaat || []).join('\n'); $('#eFakta').value = p.fakta || '';
+  $('#eBagian').value = w.bagian || ''; $('#eZat').value = w.zat || ''; $('#eProses').value = w.proses || '';
+  $('#eWarna').innerHTML = (w.warna || []).map(warnaRow).join('');
+  pendingMedia = JSON.parse(JSON.stringify(p.media || []));
+  renderMediaList(); $('#eDelConfirm').hidden = true;
+}
+function renderMediaList(){
+  $('#eMedia').innerHTML = pendingMedia.length ? pendingMedia.map((m, i) => {
+    const rec = m.id && MEDIA.get(m.id); const kind = m.url ? 'Tautan' : (rec?.type.startsWith('video') ? 'Video' : 'Gambar');
+    return `<div class="mitem"><span class="chip">${kind}</span><span class="grow">${esc(m.cap || m.url || rec?.name || '')}</span><button class="iconbtn" data-mrm="${i}" aria-label="Hapus media">×</button></div>`;
+  }).join('') : '<p class="muted" style="font-size:13.5px">Belum ada media.</p>';
+}
+$('#ePlant').onchange = loadEditor;
+$('#eAddW').onclick = () => $('#eWarna').insertAdjacentHTML('beforeend', warnaRow());
+$('#eWarna').addEventListener('click', e => { if (e.target.closest('[data-rm]')) e.target.closest('.wrow').remove(); });
+$('#eMedia').addEventListener('click', e => { const b = e.target.closest('[data-mrm]'); if (b){ pendingMedia.splice(+b.dataset.mrm, 1); renderMediaList(); } });
+$('#eFile').onchange = async e => {
+  for (const f of [...e.target.files]){
+    if (f.size > 60 * 1024 * 1024){ toast(f.name + ' lebih dari 60 MB; pakai tautan saja.'); continue; }
+    const rec = { id:'m-' + uid(), blob:f, type:f.type || 'image/jpeg', name:f.name };
+    await DB.put('media', rec); MEDIA.set(rec.id, rec);
+    pendingMedia.push({ id:rec.id, cap:$('#eCap').value.trim() });
+  }
+  e.target.value = ''; $('#eCap').value = ''; renderMediaList(); toast('Media ditambahkan. Tekan Simpan infografis.');
+};
+$('#eAddUrl').onclick = () => {
+  const u = $('#eUrl').value.trim(); if (!/^https?:\/\//i.test(u)){ toast('Tautan harus diawali https://'); return; }
+  pendingMedia.push({ url:u, cap:$('#eCap').value.trim() }); $('#eUrl').value = ''; $('#eCap').value = ''; renderMediaList();
+};
+function collectEditor(){
+  const lines = s => s.split('\n').map(x => x.trim()).filter(Boolean);
+  const warna = $$('#eWarna .wrow').map(r => ({ f:$('[data-k=f]', r).value.trim(), n:$('[data-k=n]', r).value.trim(), hex:$('[data-k=hex]', r).value }));
+  return { nama:$('#eNama').value.trim() || 'Tanpa nama', latin:$('#eLatin').value.trim(), famili:$('#eFamili').value.trim(), lokal:$('#eLokal').value.trim(),
+    lokasi:$('#eLokasi').value.trim(), ringkas:$('#eRingkas').value.trim(), ciri:lines($('#eCiri').value), manfaat:lines($('#eManfaat').value), fakta:$('#eFakta').value.trim(),
+    pewarna:{ bagian:$('#eBagian').value.trim(), zat:$('#eZat').value.trim(), proses:$('#eProses').value.trim(), warna }, media:pendingMedia, dye:warna[1]?.hex || warna[0]?.hex || '#9DB7F0' };
+}
+$('#eSave').onclick = async () => {
+  const p = plantById(editId); if (!p) return;
+  Object.assign(p, collectEditor());
+  await DB.put('plants', p); await markDirty(); fillSelects(); toast('Infografis ' + p.nama + ' tersimpan');
+};
+$('#ePreview').onclick = () => { const p = plantById(editId); if (!p) return; const tmp = { ...p, ...collectEditor() }; const mc = $('#modalCard'); mc.innerHTML = infoHTML(tmp, 'koleksi', 1); mc.querySelector('.expand')?.remove(); $('#modal').hidden = false; };
+$('#eNew').onclick = async () => {
+  let base = 'tanaman-baru', id = base, k = 2; while (plantById(id)) id = base + '-' + (k++);
+  const p = { id, nama:'Tanaman baru', latin:'', famili:'', lokal:'', dye:'#9DB7F0', lokasi:'', ringkas:'', ciri:[], manfaat:[], fakta:'', pewarna:{ bagian:'', zat:'', proses:'', warna:[{f:'Tawas',n:'',hex:'#9DB7F0'}] }, media:[] };
+  PLANTS.push(p); await DB.put('plants', p); await markDirty(); fillSelects(); $('#ePlant').value = id; loadEditor(); toast('Tanaman baru ditambahkan. Isi datanya lalu simpan.');
+};
+$('#eDel').onclick = () => $('#eDelConfirm').hidden = false;
+$('#eDelNo').onclick = () => $('#eDelConfirm').hidden = true;
+$('#eDelYes').onclick = async () => {
+  const id = editId; PLANTS = PLANTS.filter(p => p.id !== id); await DB.del('plants', id);
+  for (const s of SAMPLES.filter(s => s.plantId === id)) await DB.del('samples', s.id);
+  SAMPLES = SAMPLES.filter(s => s.plantId !== id); Index.build(); await markDirty();
+  fillSelects(); loadEditor(); toast('Tanaman dihapus');
+};
+
+/* ---------- UJI AKURASI ---------- */
+$('#btnEval').onclick = runEval;
+async function runEval(){
+  const kind = currentKind(); const out = $('#evalOut');
+  if (!kind){ out.innerHTML = '<div class="card"><p>Belum ada contoh latih.</p></div>'; return; }
+  const I = Index[kind]; const msg = $('#evalMsg');
+  const sesCount = new Map(); // kelas -> jumlah sesi
+  for (let i = 0; i < I.n; i++){ const k = I.lab[i]; if (!sesCount.has(k)) sesCount.set(k, new Set()); sesCount.get(k).add(I.ses[i]); }
+  const vec = new Float32Array(I.dim); const R = []; let skipped = 0;
+  for (let i = 0; i < I.n; i++){
+    if (i % 25 === 0){ msg.textContent = 'Menguji ' + i + '/' + I.n + '…'; await sleep(0); }
+    if (sesCount.get(I.lab[i]).size < 2){ skipped++; continue; }
+    vec.set(I.M.subarray(i*I.dim, (i+1)*I.dim));
+    const r = classify(vec, kind, I.ses[i]); if (!r) continue;
+    R.push({ y:I.lab[i], top:r.top, p:r.p, m:r.margin });
+  }
+  msg.textContent = 'Selesai · ' + (kind === 'emb' ? Engine.label : 'mode ringan') + ' · ' + R.length + ' contoh diuji';
+  if (!R.length){ out.innerHTML = '<div class="card"><p>Setiap kelas butuh minimal 2 sesi rekaman agar bisa diuji silang.</p></div>'; return; }
+  const judge = (tau, mu) => { let ok = 0, wrong = 0, rej = 0, pos = 0; for (const r of R){ const acc = r.top !== BG && r.p >= tau && r.m >= mu; if (r.y !== BG) pos++; if (acc){ if (r.top === r.y) ok++; else wrong++; } else rej++; } return { ok, wrong, rej, pos, cover: pos ? ok/pos : 0 }; };
+  const cur = judge(SET.tau, SET.mu);
+  let best = null;
+  for (let tau = 0.40; tau <= 0.985; tau += 0.02) for (let mu = 0; mu <= 0.8; mu += 0.05){
+    const j = judge(tau, mu); const cand = { tau:+tau.toFixed(2), mu:+mu.toFixed(2), ...j };
+    if (!best || cand.wrong < best.wrong || (cand.wrong === best.wrong && (cand.cover > best.cover + 1e-9 || (Math.abs(cand.cover - best.cover) < 1e-9 && cand.tau + cand.mu > best.tau + best.mu)))) best = cand;
+  }
+  // matriks kebingungan pada ambang saat ini
+  const ids = [...PLANTS.map(p => p.id), BG].filter(id => R.some(r => r.y === id));
+  const colOf = r => (r.top !== BG && r.p >= SET.tau && r.m >= SET.mu) ? r.top : (r.top === BG ? BG : '__tolak');
+  const predIds = new Set(R.map(colOf));
+  const colsIds = [...[...PLANTS.map(p => p.id), BG].filter(id => ids.includes(id) || predIds.has(id)), '__tolak'];
+  const cm = new Map(ids.map(i => [i, new Map(colsIds.map(c => [c, 0]))]));
+  for (const r of R){ const row = cm.get(r.y), col = colOf(r); if (row && row.has(col)) row.set(col, row.get(col) + 1); }
+  const shortName = id => id === '__tolak' ? 'Ditolak' : (id === BG ? 'Latar' : className(id));
+  const cmHTML = `<table class="cm"><thead><tr><th>Sebenarnya ↓ / Tebakan →</th>${colsIds.map(c => `<th class="rot">${esc(shortName(c))}</th>`).join('')}</tr></thead><tbody>${ids.map(y => {
+    const row = cm.get(y); const tot = [...row.values()].reduce((a, b) => a + b, 0) || 1;
+    return `<tr><th>${esc(shortName(y))}</th>${colsIds.map(c => { const v = row.get(c); const good = c === y || (y === BG && c === '__tolak'); const bad = !good && c !== '__tolak' && v > 0; const a = v / tot;
+      const bgc = v ? (good ? `rgba(111,207,151,${0.15 + a*0.55})` : (bad ? `rgba(235,111,94,${0.25 + a*0.6})` : `rgba(152,163,179,${0.1 + a*0.3})`)) : 'transparent';
+      return `<td style="background:${bgc}">${v || '·'}</td>`; }).join('')}</tr>`; }).join('')}</tbody></table>`;
+  const perClass = ids.filter(id => id !== BG).map(id => { const rs = R.filter(r => r.y === id); const ok = rs.filter(r => r.top === id && r.p >= SET.tau && r.m >= SET.mu).length; const wr = rs.filter(r => r.top !== id && r.top !== BG && r.p >= SET.tau && r.m >= SET.mu).length; return `<tr><td>${esc(className(id))}</td><td class="n">${rs.length}</td><td class="n">${sesCount.get(id)?.size || 0}</td><td class="n">${pct(ok / (rs.length || 1))}</td><td class="n" style="color:${wr ? 'var(--bad)' : 'inherit'}">${wr}</td></tr>`; }).join('');
+  const precision = (cur.ok + cur.wrong) ? cur.ok / (cur.ok + cur.wrong) : 1;
+  out.innerHTML = `
+    <div class="card">
+      <h3>Hasil pada ambang saat ini (τ ${SET.tau.toFixed(2)} · μ ${SET.mu.toFixed(2)})</h3>
+      <div class="stats">
+        <div class="stat ${cur.wrong ? 'bad' : 'ok'}"><b>${cur.wrong}</b><span>Salah kenali (infografis keliru)</span></div>
+        <div class="stat ${cur.wrong ? 'warn' : 'ok'}"><b>${pct(precision)}</b><span>Ketepatan saat menjawab</span></div>
+        <div class="stat"><b>${pct(cur.cover)}</b><span>Frame tanaman yang langsung terjawab</span></div>
+        <div class="stat warn"><b>${cur.rej}</b><span>Ditolak (mesin minta sudut lain)</span></div>
+      </div>
+      <p class="sub">Angka ini per satu frame. Di lapangan infografis baru muncul setelah ${SET.K} frame berturut-turut sepakat, sehingga peluang salah kenali jauh lebih kecil daripada angka per frame.${skipped ? ` ${skipped} contoh tidak diuji karena kelasnya baru punya 1 sesi.` : ''}</p>
+    </div>
+    <div class="reco">
+      <b>Ambang yang disarankan: τ ${best.tau.toFixed(2)} · μ ${best.mu.toFixed(2)}</b>
+      <span>Pada ambang ini: ${best.wrong} salah kenali, ${pct(best.cover)} frame tanaman langsung terjawab, sisanya diminta mengubah sudut.${best.wrong ? ' Masih ada salah kenali; tambah sesi rekaman untuk kelas yang tertukar (lihat matriks).' : ''}</span>
+      <div class="btnrow"><button id="applyReco" class="primary">Terapkan ambang ini</button></div>
+    </div>
+    <div class="card"><h3>Per tanaman</h3><div class="tbl"><table><thead><tr><th>Tanaman</th><th class="n">Diuji</th><th class="n">Sesi</th><th class="n">Terjawab benar</th><th class="n">Salah</th></tr></thead><tbody>${perClass}</tbody></table></div></div>
+    <div class="card"><h3>Matriks kebingungan</h3><p class="sub">Hijau = benar, merah = tertukar. Baris “Latar” yang jatuh ke “Ditolak” atau “Latar” adalah hasil yang benar.</p><div class="tbl">${cmHTML}</div></div>`;
+  $('#applyReco').onclick = async () => { SET.tau = best.tau; SET.mu = best.mu; await markDirty(); toast('Ambang diterapkan'); runEval(); };
+}
+
+/* ---------- LABEL QR ---------- */
+function appBase(){ return (location.protocol.startsWith('http') ? location.origin + location.pathname : ''); }
+function qrText(id){ const b = $('#qrBase').value.trim(); return b ? b.replace(/#.*$/, '') + '#' + id : 'KPAR:' + id; }
+function qrSVG(text){
+  if (typeof window.qrcode !== 'function') return null;
+  const q = qrcode(0, 'Q'); q.addData(text); q.make(); const n = q.getModuleCount(), m = 4; let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c + m},${r + m}h1v1h-1z`;
+  return `<svg viewBox="0 0 ${n + 2*m} ${n + 2*m}" shape-rendering="crispEdges" role="img" aria-label="QR"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+}
+async function renderLabels(){
+  if (!$('#qrBase').value) $('#qrBase').value = appBase();
+  const ok = await loadLib(['lib/qrcode.js','https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'], () => typeof window.qrcode === 'function');
+  if (!ok){ $('#qrGrid').innerHTML = '<p class="muted">Pembuat QR belum termuat (butuh internet sekali).</p>'; return; }
+  $('#qrGrid').innerHTML = PLANTS.map(p => `<div class="qlabel" style="--c:${esc(p.dye)}">${qrSVG(qrText(p.id))}<b>${esc(p.nama)}</b><i>${esc(p.latin)}</i><small>${esc(p.famili)} · Pindai untuk infografis</small></div>`).join('');
+}
+$('#qrBase').onchange = renderLabels;
+$('#btnPrint').onclick = () => { const pa = $('#printArea'); pa.innerHTML = $('#qrGrid').innerHTML; pa.style.setProperty('--cols', $('#qrCols').value); window.print(); };
+
+/* ---------- PAKET ---------- */
+async function buildPack(withMedia){
+  const media = {};
+  if (withMedia){ const used = new Set(PLANTS.flatMap(p => (p.media || []).map(m => m.id).filter(Boolean))); for (const id of used){ const r = MEDIA.get(id); if (r) media[id] = { type:r.type, name:r.name, data:await blobToDataURL(r.blob) }; } }
+  return { format:'kebun-pewarna-ar', v:1, updated:Date.now(), modelId:Engine.modelId, settings:{ tau:SET.tau, mu:SET.mu, K:SET.K, mode:SET.mode },
+    plants:PLANTS, samples:SAMPLES.map(s => ({ id:s.id, plantId:s.plantId, session:s.session, t:s.t, img:s.img, embModel:s.embModel, emb:s.emb ? f32ToB64(s.emb) : null, hc:s.hc ? f32ToB64(s.hc) : null })), media };
+}
+async function importPack(pack, silent){
+  if (!pack || pack.format !== 'kebun-pewarna-ar') throw new Error('Berkas bukan paket Kebun Pewarna AR');
+  await DB.clear('plants'); await DB.clear('samples');
+  PLANTS = pack.plants || []; for (const p of PLANTS) await DB.put('plants', p);
+  SAMPLES = (pack.samples || []).map(s => ({ ...s, emb:s.emb ? b64ToF32(s.emb) : null, hc:s.hc ? b64ToF32(s.hc) : null }));
+  for (const s of SAMPLES) await DB.put('samples', s);
+  for (const [id, m] of Object.entries(pack.media || {})){ const rec = { id, type:m.type, name:m.name, blob:await dataURLToBlob(m.data) }; await DB.put('media', rec); MEDIA.set(id, rec); }
+  Object.assign(SET, pack.settings || {}, { packUpdated:pack.updated || Date.now(), dirty:false }); await saveSet();
+  if (Engine.ready){ await reembed(); Index.build(); }
+  renderGrid(); if (!silent) toast('Paket dimuat: ' + PLANTS.length + ' tanaman, ' + SAMPLES.length + ' contoh');
+}
+$('#pkExport').onclick = async () => {
+  const b = $('#pkExport'); b.disabled = true; b.textContent = 'Menyusun paket…';
+  try{
+    const pack = await buildPack($('#pkMedia').checked);
+    const blob = new Blob([JSON.stringify(pack)], { type:'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'paket-ar.json'; document.body.appendChild(a); a.click(); a.remove();
+    SET.dirty = false; SET.packUpdated = pack.updated; await saveSet();
+    $('#pkInfo').textContent = 'Paket ' + (blob.size/1048576).toFixed(1) + ' MB diunduh. Unggah ke folder yang sama dengan index.html.';
+  }catch(e){ toast('Gagal menyusun paket: ' + e.message); }
+  b.disabled = false; b.textContent = 'Unduh paket-ar.json';
+};
+$('#pkImport').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try{ await importPack(JSON.parse(await f.text())); refreshAdmin(); }catch(err){ toast(err.message); } };
+$('#pkServer').onclick = async () => { try{ const r = await fetch('paket-ar.json', { cache:'no-cache' }); if (!r.ok) throw new Error('paket-ar.json belum ada di server'); await importPack(await r.json()); refreshAdmin(); }catch(e){ toast(e.message); } };
+async function fetchJSON(u, ms){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+  try{ const r = await fetch(u, { cache:'no-cache', signal:ctl.signal }); return r.ok ? await r.json() : null; }
+  catch(e){ return null; } finally{ clearTimeout(t); }
+}
+/** Paket dimuat dari berkas di samping aplikasi, lalu dari alamat daring (config.json → paketUrl) bila lebih baru. */
+async function autoLoadPack(){
+  if (!location.protocol.startsWith('http')) return;
+  const urls = ['paket-ar.json'];
+  const cfg = await fetchJSON('config.json', 3000);
+  if (cfg && cfg.paketUrl) urls.push(cfg.paketUrl);
+  for (const u of urls){
+    const pack = await fetchJSON(u, u === 'paket-ar.json' ? 5000 : 8000);
+    if (!pack || pack.format !== 'kebun-pewarna-ar') continue;
+    if ((pack.updated || 0) <= (SET.packUpdated || 0)) continue;
+    if (SET.dirty && !IS_APP){ toast('Ada paket baru di server. Buka Admin › Paket untuk memuatnya.'); return; }
+    try{ await importPack(pack, true); }catch(e){ console.warn('paket', u, e); }
+  }
+}
+function loadSettingsForm(){
+  $('#sMode').value = SET.mode; $('#sK').value = SET.K; $('#sTau').value = SET.tau; $('#sMu').value = SET.mu; $('#sPin').value = '';
+  $('#pkInfo').textContent = (SET.packUpdated ? 'Paket terakhir: ' + new Date(SET.packUpdated).toLocaleString('id-ID') + '. ' : '') + (SET.dirty ? 'Ada perubahan yang belum diterbitkan.' : '');
+}
+$('#sSave').onclick = async () => {
+  const modeChanged = $('#sMode').value !== SET.mode;
+  SET.mode = $('#sMode').value; SET.K = Math.max(2, Math.min(15, +$('#sK').value || 5));
+  SET.tau = Math.max(0.3, Math.min(0.99, +$('#sTau').value || 0.7)); SET.mu = Math.max(0, Math.min(0.9, +$('#sMu').value || 0.25));
+  const pin = $('#sPin').value.trim(); if (pin) SET.pin = pin;
+  await markDirty(); toast(modeChanged ? 'Tersimpan. Muat ulang halaman untuk memakai model baru.' : 'Setelan tersimpan');
+};
+$('#sReset').onclick = () => $('#sResetConfirm').hidden = false;
+$('#sResetNo').onclick = () => $('#sResetConfirm').hidden = true;
+$('#sResetYes').onclick = async () => {
+  for (const s of ['plants','samples','media']) await DB.clear(s);
+  PLANTS = JSON.parse(JSON.stringify(SEED)); for (const p of PLANTS) await DB.put('plants', p);
+  SAMPLES = []; MEDIA.clear(); SET = { ...DEF_SET, pin:SET.pin }; await saveSet(); Index.build();
+  $('#sResetConfirm').hidden = true; refreshAdmin(); toast('Data dikosongkan');
+};
+
+/* =====================================================================
+   8. MULAI
+   ===================================================================== */
+document.addEventListener('visibilitychange', () => { if (document.hidden) Tracker.reset(); });
+(async function boot(){
+  await DB.open();
+  try{ const s = await DB.get('kv', 'settings'); if (s){ delete s.id; SET = { ...DEF_SET, ...s }; } }catch(e){}
+  try{ PLANTS = await DB.all('plants'); }catch(e){ PLANTS = []; }
+  if (!PLANTS.length){ PLANTS = JSON.parse(JSON.stringify(SEED)); for (const p of PLANTS) await DB.put('plants', p).catch(()=>{}); }
+  else { const order = SEED.map(s => s.id); PLANTS.sort((a, b) => (order.indexOf(a.id) + 1 || 99) - (order.indexOf(b.id) + 1 || 99)); }
+  try{ SAMPLES = await DB.all('samples'); }catch(e){ SAMPLES = []; }
+  try{ (await DB.all('media')).forEach(m => MEDIA.set(m.id, m)); }catch(e){}
+  if (!window.isSecureContext) $('#noSecure').hidden = false;
+  if (IS_APP) setHint('Arahkan kotak ke daun, ranting, atau label QR.');
+  if (!coachSeen()) $('#coach').hidden = false;
+  else if (IS_APP) startCamera();
+  await autoLoadPack();
+  renderGrid(); fillSelects();
+  const h = decodeURIComponent(location.hash.slice(1)).toLowerCase();
+  if (h && plantById(h)) openModal(h, 'tautan');
+  Index.build();
+  Engine.init().catch(e => { console.error(e); Engine.ready = true; Engine.kind = 'hc'; Index.build(); updatePill(); });
+})();
+window.addEventListener('hashchange', () => { const h = decodeURIComponent(location.hash.slice(1)).toLowerCase(); if (plantById(h)) openModal(h, 'tautan'); });
+})();
+</script>
+</body>
+</html>

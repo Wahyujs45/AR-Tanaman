@@ -1,0 +1,146 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
+plugins {
+    id 'com.android.application'
+}
+
+def appId    = (findProperty('kebun.applicationId') ?: 'id.kebunpewarna.ar').toString().trim()
+def vCode    = (findProperty('kebun.versionCode') ?: '1').toString().trim().toInteger()
+def vName    = (findProperty('kebun.versionName') ?: '1.0').toString().trim()
+def paketUrl = (findProperty('kebun.paketUrl') ?: '').toString().trim()
+
+// ---------------------------------------------------------------------
+// Tanda tangan rilis (opsional).
+// Android Studio: cukup pakai menu Build > Generate Signed App Bundle.
+// GitHub Actions / baris perintah: isi keystore.properties atau variabel
+// lingkungan KEBUN_KEYSTORE_PATH, KEBUN_STORE_PASSWORD, KEBUN_KEY_ALIAS,
+// KEBUN_KEY_PASSWORD.
+// ---------------------------------------------------------------------
+def ks = new Properties()
+def ksFile = rootProject.file('keystore.properties')
+if (ksFile.exists()) ksFile.withInputStream { ks.load(it) }
+def ksPath = ks.getProperty('storeFile') ?: System.getenv('KEBUN_KEYSTORE_PATH')
+def hasSigning = ksPath && rootProject.file(ksPath).exists()
+
+android {
+    namespace 'id.kebunpewarna.ar'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId appId
+        minSdk 26
+        targetSdk 36
+        versionCode vCode
+        versionName vName
+    }
+
+    signingConfigs {
+        if (hasSigning) {
+            release {
+                storeFile rootProject.file(ksPath)
+                storePassword ks.getProperty('storePassword') ?: System.getenv('KEBUN_STORE_PASSWORD')
+                keyAlias ks.getProperty('keyAlias') ?: System.getenv('KEBUN_KEY_ALIAS')
+                keyPassword ks.getProperty('keyPassword') ?: System.getenv('KEBUN_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (hasSigning) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
+
+// ---------------------------------------------------------------------
+// Aset web: aplikasi disalin dari ../docs, lalu pustaka dan model
+// jaringan saraf diunduh SEKALI saat build dan dikemas ke dalam APK/AAB.
+// Hasilnya aplikasi berjalan penuh tanpa internet di HP pengunjung.
+// ---------------------------------------------------------------------
+def wwwDir  = file('src/main/assets/www')
+def docsDir = rootProject.file('../docs')
+
+def unduh = { String url, File dest ->
+    dest.parentFile.mkdirs()
+    def tmp = new File(dest.path + '.part')
+    println "Kebun Pewarna AR: mengunduh ${url}"
+    try {
+        def conn = URI.create(url).toURL().openConnection()
+        conn.connectTimeout = 30000
+        conn.readTimeout = 180000
+        conn.inputStream.withCloseable { input -> tmp.withOutputStream { out -> out << input } }
+        if (tmp.length() == 0) throw new IOException('berkas kosong')
+        Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    } catch (Exception e) {
+        tmp.delete()
+        throw new GradleException("Gagal mengunduh ${url}. Pastikan komputer tersambung ke internet saat build pertama. (${e.message})")
+    }
+}
+
+tasks.register('siapkanAsetWeb') {
+    group = 'kebun'
+    description = 'Menyalin aplikasi web dari ../docs dan mengunduh pustaka + model agar aplikasi berjalan luring.'
+    doLast {
+        wwwDir.mkdirs()
+
+        // 1. Aplikasi web dan paket pelatihan
+        def src = new File(docsDir, 'index.html')
+        if (!src.exists()) throw new GradleException("Tidak menemukan ${src}. Folder docs harus berada di samping folder android.")
+        Files.copy(src.toPath(), new File(wwwDir, 'index.html').toPath(), StandardCopyOption.REPLACE_EXISTING)
+        def pk = new File(docsDir, 'paket-ar.json')
+        def pkDst = new File(wwwDir, 'paket-ar.json')
+        if (pk.exists()) {
+            Files.copy(pk.toPath(), pkDst.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            println 'Kebun Pewarna AR: paket-ar.json ikut dikemas.'
+        } else {
+            pkDst.delete()
+            println 'Kebun Pewarna AR: PERINGATAN — docs/paket-ar.json belum ada; aplikasi hanya mengenali label QR sampai paket daring tersedia.'
+        }
+
+        // 2. Konfigurasi
+        new File(wwwDir, 'config.json').write(JsonOutput.toJson([paketUrl: paketUrl]), 'UTF-8')
+
+        // 3. Pustaka JavaScript
+        [
+            'lib/tf.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',
+            'lib/jsQR.js'   : 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
+            'lib/qrcode.js' : 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'
+        ].each { rel, url ->
+            def f = new File(wwwDir, rel)
+            if (!f.exists() || f.length() == 0) unduh(url, f)
+        }
+
+        // 4. Model MobileNetV2 1.0 (model.json + semua pecahan bobot)
+        def base = 'https://storage.googleapis.com/teachable-machine-models/mobilenet_v2_weights_tf_dim_ordering_tf_kernels_1.0_224_no_top/'
+        def mdir = new File(wwwDir, 'model/mobilenet_v2_100')
+        def mj = new File(mdir, 'model.json')
+        if (!mj.exists() || mj.length() == 0) unduh(base + 'model.json', mj)
+        def manifest = new JsonSlurper().parse(mj)
+        manifest.weightsManifest.each { group ->
+            group.paths.each { p ->
+                def f = new File(mdir, p.toString())
+                if (!f.exists() || f.length() == 0) unduh(base + p, f)
+            }
+        }
+    }
+}
+
+tasks.named('preBuild') { dependsOn 'siapkanAsetWeb' }
